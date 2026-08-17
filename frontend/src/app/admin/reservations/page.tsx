@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useCrud } from '@/lib/use-crud';
 import { Alert, Field, SelectField } from '@/components/admin-ui';
@@ -14,6 +15,7 @@ import {
   type Reservation,
   type ReservationType,
 } from '@/lib/reservations';
+import { fullName, type Visitor } from '@/lib/visitors';
 
 const PAGE_SIZE = 20;
 
@@ -30,6 +32,7 @@ const EMPTY = {
   startAt: '',
   endAt: '',
   vehiclePlate: '',
+  visitorId: '',
 };
 
 /** Pantalla A04 — Reservas administrativas. */
@@ -56,6 +59,9 @@ export default function AdminReservationsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [best, setBest] = useState<BestSpace[]>([]);
+
+  // Sección 16 — la reserva del evento se hace a nombre de un visitante
+  const { items: visitors } = useCrud<Visitor>('/visitors', '?limit=100');
 
   // US-007 — sugerir los mejores puestos para autoridades y profesores (§17)
   useEffect(() => {
@@ -100,6 +106,7 @@ export default function AdminReservationsPage() {
         startAt: localInputToISO(form.startAt),
         endAt: localInputToISO(form.endAt),
         ...(form.vehiclePlate && { vehiclePlate: form.vehiclePlate }),
+        ...(form.visitorId && { visitorId: form.visitorId }),
       });
 
       setForm(EMPTY);
@@ -193,7 +200,43 @@ export default function AdminReservationsPage() {
             onChange={(vehiclePlate) => setForm({ ...form, vehiclePlate })}
             placeholder="ABC123"
           />
+
+          <div className="md:col-span-2">
+            <SelectField
+              id="res-visitor"
+              label="Visitante"
+              value={form.visitorId}
+              onChange={(visitorId) => {
+                // Al elegir visitante se hereda su placa si aún no se escribió
+                const visitor = visitors.find((v) => v.id === visitorId);
+                setForm((f) => ({
+                  ...f,
+                  visitorId,
+                  vehiclePlate:
+                    f.vehiclePlate || (visitor?.vehiclePlate ?? ''),
+                }));
+              }}
+              options={visitors.map((v) => ({
+                value: v.id,
+                label: `${fullName(v)}${v.organization ? ` — ${v.organization}` : ''}`,
+              }))}
+              placeholder="Sin visitante asociado"
+            />
+          </div>
         </div>
+
+        {visitors.length === 0 && (
+          <p className="mt-3 text-xs text-slate-500">
+            Para reservar a nombre de alguien externo, regístrelo primero en{' '}
+            <Link
+              href="/admin/visitors"
+              className="text-blue-400 hover:text-blue-300"
+            >
+              Visitantes
+            </Link>
+            .
+          </p>
+        )}
 
         {/* US-007 — mejores puestos disponibles */}
         {best.length > 0 && (
@@ -291,6 +334,7 @@ export default function AdminReservationsPage() {
                     <th scope="col" className="text-left px-4 py-3">Motivo</th>
                     <th scope="col" className="text-left px-4 py-3">Tipo</th>
                     <th scope="col" className="text-left px-4 py-3">Período</th>
+                    <th scope="col" className="text-left px-4 py-3">Para</th>
                     <th scope="col" className="text-left px-4 py-3">Placa</th>
                     <th scope="col" className="text-left px-4 py-3">Estado</th>
                     <th scope="col" className="text-right px-4 py-3">Acciones</th>
@@ -312,6 +356,13 @@ export default function AdminReservationsPage() {
                         </td>
                         <td className="px-4 py-3 text-slate-300 whitespace-nowrap">
                           {formatRange(r.startAt, r.endAt)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-400">
+                          {r.visitor
+                            ? fullName(r.visitor)
+                            : r.user
+                              ? fullName(r.user)
+                              : '—'}
                         </td>
                         <td className="px-4 py-3 text-slate-400 font-mono">
                           {r.vehiclePlate ?? '—'}

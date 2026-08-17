@@ -92,6 +92,7 @@ export class ReservationsService {
     }
 
     await this.assertSpaceExists(dto.parkingSpaceId);
+    await this.assertVisitorExists(dto.visitorId);
 
     try {
       const reservation = await this.prisma.reservation.create({
@@ -164,6 +165,26 @@ export class ReservationsService {
     if (!space) {
       throw new NotFoundException(
         `Puesto con ID ${parkingSpaceId} no encontrado`,
+      );
+    }
+  }
+
+  /**
+   * Sin esto, un visitante inexistente produce un error de clave ajena que el
+   * filtro global traduce a un 400 genérico; el administrador merece saber que
+   * el problema es el visitante y no el puesto ni las fechas.
+   */
+  private async assertVisitorExists(visitorId?: string) {
+    if (!visitorId) return;
+
+    const visitor = await this.prisma.visitor.findUnique({
+      where: { id: visitorId },
+      select: { id: true },
+    });
+
+    if (!visitor) {
+      throw new NotFoundException(
+        `Visitante con ID ${visitorId} no encontrado`,
       );
     }
   }

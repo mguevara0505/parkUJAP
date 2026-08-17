@@ -268,11 +268,16 @@ model Reservation {
   @@map("reservations")
 }
 
+/// `documentId` es único cuando se informa: la cédula identifica a la persona
+/// y dos fichas con la misma crearían visitantes duplicados que el
+/// administrador no podría distinguir al buscar (sección 59, riesgo 5).
+/// En PostgreSQL varios NULL no colisionan, así que el campo sigue siendo
+/// opcional para visitantes de los que solo se tiene el nombre.
 model Visitor {
   id             String   @id @default(uuid())
   firstName      String
   lastName       String
-  documentId     String?
+  documentId     String?  @unique
   email          String?
   phone          String?
   organization   String?

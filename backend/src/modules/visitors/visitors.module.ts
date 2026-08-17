@@ -1,13 +1,10 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { VisitorsController } from './visitors.controller';
+import { VisitorsService } from './visitors.service';
 
-/**
- * Módulo Visitors
- * Se implementará en sprints posteriores.
- * Estructura base creada en Sprint 0.
- */
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  controllers: [VisitorsController],
+  providers: [VisitorsService],
+  exports: [VisitorsService],
 })
 export class VisitorsModule {}

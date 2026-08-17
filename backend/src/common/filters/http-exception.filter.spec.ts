@@ -29,6 +29,21 @@ describe('translatePrismaError', () => {
     expect(result.message).toContain('email');
   });
 
+  it('limpia las comillas del identificador de PostgreSQL', () => {
+    // El adaptador devuelve '"documentId"'; el mensaje lo lee una persona
+    const result = translatePrismaError({
+      code: 'P2002',
+      meta: {
+        driverAdapterError: {
+          cause: { constraint: { fields: ['"documentId"'] } },
+        },
+      },
+    });
+
+    expect(result.message).toContain('documentId');
+    expect(result.message).not.toContain('"');
+  });
+
   it('P2002 sin metadatos no imprime "undefined"', () => {
     const result = translatePrismaError({ code: 'P2002' });
 

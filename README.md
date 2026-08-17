@@ -145,8 +145,8 @@ ujap-parking/
 | 5 | Check-in / Check-out | ✅ Completado |
 | 6 | Concurrencia | ✅ Completado |
 | 7 | Reservas administrativas | ✅ Completado |
-| 8 | Visitantes y eventos | ⏳ En curso |
-| 9 | Bloqueos y mantenimiento | ⏳ Pendiente |
+| 8 | Visitantes y eventos | ✅ Completado |
+| 9 | Bloqueos y mantenimiento | ⏳ En curso |
 | 10 | Dashboard + Auditoría | ⏳ Pendiente |
 | 11 | QA + Seguridad + Performance | ⏳ Pendiente |
 | 12 | Deploy MVP | ⏳ Pendiente |

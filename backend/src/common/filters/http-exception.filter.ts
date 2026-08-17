@@ -20,9 +20,13 @@ import { Prisma } from '@prisma/client';
 function uniqueConstraintFields(
   meta: Record<string, unknown> | undefined,
 ): string | null {
+  // PostgreSQL devuelve los identificadores entrecomillados ("documentId");
+  // el mensaje lo lee una persona, no un parser
+  const clean = (value: string) => value.replace(/"/g, '');
+
   const target = meta?.target;
-  if (Array.isArray(target)) return target.join(', ');
-  if (typeof target === 'string') return target;
+  if (Array.isArray(target)) return target.map(String).map(clean).join(', ');
+  if (typeof target === 'string') return clean(target);
 
   const constraint = (
     meta?.driverAdapterError as
@@ -30,8 +34,10 @@ function uniqueConstraintFields(
       | undefined
   )?.cause?.constraint;
 
-  if (Array.isArray(constraint?.fields)) return constraint.fields.join(', ');
-  if (typeof constraint?.index === 'string') return constraint.index;
+  if (Array.isArray(constraint?.fields)) {
+    return constraint.fields.map(String).map(clean).join(', ');
+  }
+  if (typeof constraint?.index === 'string') return clean(constraint.index);
 
   return null;
 }
