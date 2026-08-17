@@ -198,6 +198,12 @@ model ParkingSpace {
   @@map("parking_spaces")
 }
 
+/// RN-001 y RN-002 se aplican con dos índices únicos PARCIALES creados a mano
+/// en la migración 20260817173402_active_session_partial_unique_indexes:
+///   - parking_sessions_one_active_per_user  ("userId"          WHERE status = 'ACTIVE')
+///   - parking_sessions_one_active_per_space ("parkingSpaceId"  WHERE status = 'ACTIVE')
+/// Prisma no puede expresar la cláusula WHERE, así que no aparecen abajo.
+/// IMPORTANTE: si `prisma migrate dev` propone eliminarlos, no aceptar.
 model ParkingSession {
   id             String        @id @default(uuid())
   userId         String

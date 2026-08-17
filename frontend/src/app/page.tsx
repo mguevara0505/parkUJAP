@@ -141,7 +141,8 @@ const sprints = [
   { number: 2, name: 'Estacionamientos + Zonas', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
   { number: 3, name: 'Puestos (~1.000)', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
   { number: 4, name: 'Mapa Visual SVG', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
-  { number: 5, name: 'Check-in / Check-out', icon: '⏳', statusLabel: 'Siguiente', statusClass: 'bg-blue-500/20 text-blue-400' },
+  { number: 5, name: 'Check-in / Check-out', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
+  { number: 6, name: 'Concurrencia', icon: '⏳', statusLabel: 'Siguiente', statusClass: 'bg-blue-500/20 text-blue-400' },
 ];
 
 const tech = [

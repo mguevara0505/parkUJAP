@@ -1,13 +1,10 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { ParkingSessionsController } from './parking-sessions.controller';
+import { ParkingSessionsService } from './parking-sessions.service';
 
-/**
- * Módulo ParkingSessions
- * Se implementará en sprints posteriores.
- * Estructura base creada en Sprint 0.
- */
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  controllers: [ParkingSessionsController],
+  providers: [ParkingSessionsService],
+  exports: [ParkingSessionsService],
 })
 export class ParkingSessionsModule {}

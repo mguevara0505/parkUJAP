@@ -142,8 +142,8 @@ ujap-parking/
 | 2 | Estacionamientos + Zonas | ✅ Completado |
 | 3 | Puestos (~1.000) | ✅ Completado |
 | 4 | Mapa Visual (SVG) | ✅ Completado |
-| 5 | Check-in / Check-out | ⏳ En curso |
-| 6 | Concurrencia | ⏳ Pendiente |
+| 5 | Check-in / Check-out | ✅ Completado |
+| 6 | Concurrencia | 🔷 Mayormente cubierto en el Sprint 5 |
 | 7 | Reservas administrativas | ⏳ Pendiente |
 | 8 | Visitantes y eventos | ⏳ Pendiente |
 | 9 | Bloqueos y mantenimiento | ⏳ Pendiente |

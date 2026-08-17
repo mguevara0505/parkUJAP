@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './database/prisma/prisma.module';
@@ -17,6 +17,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
 import appConfig from './config/app.config';
 
 @Module({
@@ -28,11 +29,13 @@ import appConfig from './config/app.config';
       envFilePath: ['.env.development', '.env'],
     }),
 
-    // Rate limiting — protección contra abuso (sección 24)
+    // Rate limiting — protección contra abuso (sección 24).
+    // 'short' a 30/s porque una sola pantalla dispara varias peticiones en
+    // paralelo (mapa + zonas + sesión activa); con 10/s se bloqueaba a sí misma.
     ThrottlerModule.forRoot([
-      { name: 'short', ttl: 1000, limit: 10 },
-      { name: 'medium', ttl: 10000, limit: 50 },
-      { name: 'long', ttl: 60000, limit: 200 },
+      { name: 'short', ttl: 1000, limit: 30 },
+      { name: 'medium', ttl: 10000, limit: 120 },
+      { name: 'long', ttl: 60000, limit: 600 },
     ]),
 
     // Scheduler para jobs (activar/finalizar reservas, mantenimiento)
@@ -62,10 +65,11 @@ import appConfig from './config/app.config';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    // Rate limiting global
+    // Rate limiting global. Va después del guard JWT para que `req.user` ya
+    // exista y la cuota se cuente por usuario, no por la IP del NAT del campus.
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: UserThrottlerGuard,
     },
   ],
 })
