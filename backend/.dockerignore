@@ -1,0 +1,17 @@
+# node_modules del host: son binarios de Windows y pisarían los que instala
+# `npm ci` dentro de la imagen Linux.
+node_modules
+dist
+
+# Secretos: `COPY . .` los metería en la capa del build. Aunque la imagen
+# final solo copie dist/, no tienen por qué pasar por ahí.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+test
+coverage
+*.log
+.git
+.github

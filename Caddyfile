@@ -1,0 +1,33 @@
+# UJAP Parking — entrada HTTPS
+#
+# Caddy pide y renueva el certificado de Let's Encrypt por su cuenta. Para eso
+# hace falta que {$DOMAIN} apunte de verdad a este servidor y que los puertos
+# 80 y 443 estén abiertos: la validación llega por ahí.
+#
+# Para probar en un servidor sin dominio, poner DOMAIN=localhost en .env;
+# Caddy emite entonces un certificado local en vez de pedir uno público.
+
+{$DOMAIN} {
+	# Todo /api va a NestJS. Se pone primero porque en Caddy gana la ruta más
+	# específica, pero dejarlo arriba se lee mejor.
+	handle /api/* {
+		reverse_proxy api:3001
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	encode gzip
+
+	# HSTS: una vez que el navegador ha entrado por HTTPS, que no vuelva a
+	# intentarlo por HTTP. Caddy ya redirige 80 → 443 solo.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	log {
+		output file /data/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

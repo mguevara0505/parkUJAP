@@ -44,8 +44,11 @@ coverage/
 Thumbs.db
 
 # Docker
-.dockerignore
+# .dockerignore SÍ se versiona: sin él, `COPY . .` mete el node_modules de
+# Windows dentro de la imagen Linux y cambia la salida del build. Ignorarlo
+# hacía que las imágenes solo se construyeran bien en esta máquina.
 
 # Temporales
 tmp/
 temp/
+backups/

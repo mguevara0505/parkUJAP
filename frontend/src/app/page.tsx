@@ -148,7 +148,7 @@ const sprints = [
   { number: 9, name: 'Bloqueos y Mantenimiento', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
   { number: 10, name: 'Dashboard + Auditoría', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
   { number: 11, name: 'QA + Seguridad + Rendimiento', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
-  { number: 12, name: 'Despliegue del MVP', icon: '⏳', statusLabel: 'Siguiente', statusClass: 'bg-blue-500/20 text-blue-400' },
+  { number: 12, name: 'Despliegue del MVP', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
 ];
 
 const tech = [

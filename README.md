@@ -175,7 +175,9 @@ ujap-parking/
 | 9 | Bloqueos y mantenimiento | ✅ Completado |
 | 10 | Dashboard + Auditoría | ✅ Completado |
 | 11 | QA + Seguridad + Performance | ✅ Completado |
-| 12 | Deploy MVP | ⏳ Pendiente |
+| 12 | Deploy MVP | ✅ Completado |
+
+Para poner el sistema en un servidor: **[DESPLIEGUE.md](DESPLIEGUE.md)**.
 
 ---
 

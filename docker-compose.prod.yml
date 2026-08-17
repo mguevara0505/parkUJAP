@@ -1,0 +1,127 @@
+# ─────────────────────────────────────────────────────────
+# UJAP Parking — Docker Compose (Producción)
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Todos los valores sensibles salen de `.env` (ver .env.prod.example).
+# Este archivo NO contiene ninguna contraseña.
+#
+# Diferencias con el compose de desarrollo:
+#   · PostgreSQL no publica puertos: solo se llega desde la red interna
+#   · sin pgAdmin: una consola de base de datos abierta a internet no se pone
+#   · Caddy delante, que resuelve el HTTPS y los certificados
+#   · la API corre el `production` de su Dockerfile, no el de build
+# ─────────────────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL ────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ujap_parking_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Los respaldos se escriben aquí desde el host (ver scripts/backup.sh)
+      - ./backups:/backups
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ujap_network
+
+  # ── API NestJS ────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      target: production
+    container_name: ujap_parking_api
+    restart: always
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Las migraciones se aplican al arrancar, con `deploy`: ejecuta lo que hay
+    # y no propone cambios. Es lo que impide que toque los índices parciales y
+    # la restricción EXCLUDE escritos a mano.
+    command: sh -c "npx prisma migrate deploy && node dist/main"
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:3001/api/v1/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ujap_network
+
+  # ── Frontend Next.js ──────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+      args:
+        # De construcción, no de ejecución: el navegador recibe esta URL ya
+        # incrustada en el bundle.
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+    container_name: ujap_parking_frontend
+    restart: always
+    depends_on:
+      - api
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:3000/']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - ujap_network
+
+  # ── Caddy: HTTPS y punto de entrada ───────────────────
+  # Pide y renueva los certificados de Let's Encrypt solo. Es la forma más
+  # corta de tener HTTPS de verdad; nginx + certbot es el triple de piezas.
+  caddy:
+    image: caddy:2-alpine
+    container_name: ujap_parking_caddy
+    restart: always
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # certificados: si se pierde, hay que re-emitir
+      - caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+    networks:
+      - ujap_network
+
+# Nombres propios, distintos de los del compose de desarrollo. Compartirlos
+# cruza las dos pilas en silencio si alguien las levanta en la misma máquina:
+# el host `postgres` acaba resolviendo a la base equivocada, y el síntoma que
+# se ve es «credenciales no válidas» en unas peticiones sí y en otras no.
+volumes:
+  postgres_data:
+    name: ujap_parking_prod_postgres_data
+  caddy_data:
+    name: ujap_parking_prod_caddy_data
+  caddy_config:
+    name: ujap_parking_prod_caddy_config
+
+networks:
+  ujap_network:
+    name: ujap_parking_prod_network
+    driver: bridge
