@@ -17,8 +17,26 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+/**
+ * Límite propio del login, mucho más estricto que el resto de la API
+ * (sección 24). Cuenta por correo, no por IP: ver UserThrottlerGuard.
+ *
+ * Diez intentos cada cinco minutos deja margen de sobra a quien teclea mal la
+ * contraseña y hace inviable probar un diccionario.
+ *
+ * Los tests e2e sí repiten logins fallidos a propósito, así que en entorno de
+ * prueba el límite se levanta. `NODE_ENV` ya vale 'test' cuando Jest importa
+ * este archivo, que es cuando se evalúa el decorador.
+ */
+const LOGIN_MAX_ATTEMPTS = Number(
+  process.env.LOGIN_MAX_ATTEMPTS ??
+    (process.env.NODE_ENV === 'test' ? 10_000 : 10),
+);
+const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -30,6 +48,7 @@ export class AuthController {
    * Sección 23 — CU-001
    */
   @Public()
+  @Throttle({ short: { limit: LOGIN_MAX_ATTEMPTS, ttl: LOGIN_WINDOW_MS } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Iniciar sesión y obtener tokens JWT' })

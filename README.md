@@ -173,8 +173,8 @@ ujap-parking/
 | 7 | Reservas administrativas | ✅ Completado |
 | 8 | Visitantes y eventos | ✅ Completado |
 | 9 | Bloqueos y mantenimiento | ✅ Completado |
-| 10 | Dashboard + Auditoría | ⏳ En curso |
-| 11 | QA + Seguridad + Performance | ⏳ Pendiente |
+| 10 | Dashboard + Auditoría | ✅ Completado |
+| 11 | QA + Seguridad + Performance | ✅ Completado |
 | 12 | Deploy MVP | ⏳ Pendiente |
 
 ---
@@ -199,6 +199,29 @@ npm run test:e2e
 
 Los tests E2E crean y borran sus propios usuarios `e2e-*`, así que no dependen del seed
 ni lo modifican.
+
+### Prueba de carga
+
+Comprueba los objetivos de rendimiento de la sección 46 con los 100 usuarios
+simultáneos que exige la sección 11, contra una API ya levantada:
+
+```bash
+npm run test:load
+```
+
+Mide el mapa, el dashboard y el check-in, y verifica que 100 personas peleando
+por el mismo puesto produzcan **exactamente una** ocupación.
+
+Últimos resultados medidos (API en modo desarrollo, 1.000 puestos):
+
+| Medida | Objetivo | p50 | p95 |
+|--------|----------|-----|-----|
+| `GET /parking-spaces/map` | < 500 ms | 258 ms | 411 ms |
+| `GET /dashboard/summary` | < 1 s | 52 ms | 61 ms |
+| `POST /parking-sessions/check-in` | < 500 ms | 471 ms | 483 ms |
+
+Los tiempos son los del **último de 100 peticiones en cola**, no los de una
+petición aislada.
 
 ---
 

@@ -21,7 +21,8 @@
     "seed": "ts-node -r tsconfig-paths/register src/database/seeds/seed.ts",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test:load": "ts-node -r tsconfig-paths/register test/load/load-test.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

@@ -3,8 +3,6 @@
 # Servicios: api + postgres + frontend + pgadmin
 # ─────────────────────────────────────────────────────────
 
-version: '3.9'
-
 services:
   # ── PostgreSQL ────────────────────────────────────────
   postgres:

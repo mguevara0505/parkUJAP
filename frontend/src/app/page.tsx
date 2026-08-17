@@ -146,7 +146,9 @@ const sprints = [
   { number: 7, name: 'Reservas administrativas', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
   { number: 8, name: 'Visitantes + Eventos', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
   { number: 9, name: 'Bloqueos y Mantenimiento', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
-  { number: 10, name: 'Dashboard + Auditoría', icon: '⏳', statusLabel: 'Siguiente', statusClass: 'bg-blue-500/20 text-blue-400' },
+  { number: 10, name: 'Dashboard + Auditoría', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
+  { number: 11, name: 'QA + Seguridad + Rendimiento', icon: '✅', statusLabel: 'Completado', statusClass: 'bg-green-500/20 text-green-400' },
+  { number: 12, name: 'Despliegue del MVP', icon: '⏳', statusLabel: 'Siguiente', statusClass: 'bg-blue-500/20 text-blue-400' },
 ];
 
 const tech = [

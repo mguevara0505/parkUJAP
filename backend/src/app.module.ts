@@ -26,7 +26,9 @@ import appConfig from './config/app.config';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig],
-      envFilePath: ['.env.development', '.env'],
+      // El primero que exista gana. Así `NODE_ENV=test` toma .env.test y
+      // producción toma .env, sin tocar código al desplegar.
+      envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
     }),
 
     // Rate limiting — protección contra abuso (sección 24).

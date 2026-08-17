@@ -21,7 +21,18 @@ export class PrismaService
       process.env.DATABASE_URL ??
       'postgresql://ujap_user:ujap_password@localhost:5432/ujap_parking_db?schema=public';
 
-    const pool = new Pool({ connectionString });
+    /**
+     * `pg` trae 10 conexiones por defecto. Con los 100 usuarios simultáneos
+     * que exige la sección 11, las peticiones se serializaban de diez en diez
+     * y el check-in se iba por encima del objetivo de 500 ms de la sección 46.
+     *
+     * 25 es holgado para este tamaño y sigue muy por debajo del
+     * `max_connections` de PostgreSQL (100 por defecto), que hay que repartir
+     * entre todas las instancias de la API.
+     */
+    const poolSize = Number(process.env.DATABASE_POOL_SIZE ?? 25);
+
+    const pool = new Pool({ connectionString, max: poolSize });
     const adapter = new PrismaPg(pool);
 
     super({ adapter });
@@ -40,28 +51,9 @@ export class PrismaService
     await this.pool.end();
     this.logger.log('Desconectado de PostgreSQL');
   }
-
-  /**
-   * Limpia todas las tablas en orden correcto (para tests).
-   * Solo disponible en entorno de test.
-   */
-  async cleanDatabase() {
-    if (process.env.NODE_ENV !== 'test') {
-      throw new Error('cleanDatabase solo puede ejecutarse en entorno de test');
-    }
-
-    const tablenames = await this.$queryRaw<
-      Array<{ tablename: string }>
-    >`SELECT tablename FROM pg_tables WHERE schemaname='public'`;
-
-    const tables = tablenames
-      .map(({ tablename }) => tablename)
-      .filter((name) => name !== '_prisma_migrations')
-      .map((name) => `"public"."${name}"`)
-      .join(', ');
-
-    if (tables.length > 0) {
-      await this.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`);
-    }
-  }
 }
+
+// Aquí vivía cleanDatabase(): un TRUNCATE de todas las tablas «solo para
+// tests». No la llamaba nadie, y como los e2e corren contra la misma base que
+// el desarrollo, la única forma de usarla era borrar el seed por accidente.
+// Los e2e limpian lo suyo con los helpers de test/e2e-helpers.ts.
