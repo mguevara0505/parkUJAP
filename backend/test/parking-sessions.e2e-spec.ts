@@ -35,6 +35,14 @@ interface SessionBody {
   };
 }
 
+/** GET /me/active devuelve los puestos activos junto con el tope. */
+interface ActiveBody {
+  data: {
+    limit: number;
+    sessions: { id: string; parkingSpace: { code: string } }[];
+  };
+}
+
 describe('Parking Sessions (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
@@ -154,32 +162,39 @@ describe('Parking Sessions (e2e)', () => {
         .set(auth(userToken))
         .expect(200);
 
-      expect((res.body as SessionBody).data.parkingSpace.code).toBe('B-010');
+      const { data } = res.body as ActiveBody;
+      expect(data.sessions).toHaveLength(1);
+      expect(data.sessions[0].parkingSpace.code).toBe('B-010');
     });
 
-    it('RN-002: el mismo usuario no puede ocupar un segundo puesto', async () => {
+    // RN-002 revisada: el tope depende de la categoría. E2E_USER es estudiante,
+    // así que puede con dos; el detalle por categoría vive en su propia suite.
+    it('RN-002: al llegar a su tope no puede ocupar otro puesto', async () => {
       const first = await resetSpace('B-010');
       const second = await resetSpace('B-011');
+      const third = await resetSpace('B-012');
 
-      await http()
-        .post('/api/v1/parking-sessions/check-in')
-        .set(auth(userToken))
-        .send({ parkingSpaceId: first.id })
-        .expect(201);
+      for (const space of [first, second]) {
+        await http()
+          .post('/api/v1/parking-sessions/check-in')
+          .set(auth(userToken))
+          .send({ parkingSpaceId: space.id })
+          .expect(201);
+      }
 
       const res = await http()
         .post('/api/v1/parking-sessions/check-in')
         .set(auth(userToken))
-        .send({ parkingSpaceId: second.id })
+        .send({ parkingSpaceId: third.id })
         .expect(409);
 
       expect((res.body as { code: string }).code).toBe(
         'USER_ALREADY_HAS_ACTIVE_SESSION',
       );
 
-      // El segundo puesto no debe haberse tocado
+      // El tercer puesto no debe haberse tocado
       const untouched = await prisma.parkingSpace.findUniqueOrThrow({
-        where: { id: second.id },
+        where: { id: third.id },
       });
       expect(untouched.status).toBe(SpaceStatus.AVAILABLE);
     });

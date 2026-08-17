@@ -19,6 +19,24 @@ import { paginate } from '../../common/dto/pagination.dto';
 import { CheckInDto } from './dto/check-in.dto';
 import { SessionQueryDto } from './dto/session-query.dto';
 
+/**
+ * Cuántos puestos puede tener ocupados a la vez cada categoría (RN-002).
+ *
+ * Un estudiante puede necesitar dos —coche y moto, o un vehículo compartido
+ * con un compañero—, mientras que a profesores y administrativos les
+ * corresponde uno. El tope real lo impone el índice único de la base de datos
+ * sobre (userId, slot): aquí solo se decide qué cupo pedir.
+ *
+ * ponytail: constante y no configuración en base de datos. Cuando la
+ * universidad quiera cambiarlo por reglamento, se mueve a ParkingLot o a una
+ * tabla de parámetros; hoy sería configuración sin nadie que la configure.
+ */
+export const ACTIVE_SESSION_LIMIT: Record<UserCategory, number> = {
+  STUDENT: 2,
+  PROFESSOR: 1,
+  STAFF: 1,
+};
+
 /** Datos del puesto que acompañan a una sesión en las respuestas. */
 const SESSION_INCLUDE = {
   parkingSpace: {
@@ -59,24 +77,61 @@ export class ParkingSessionsService {
    * RN-002 la garantiza además un índice único parcial en la base de datos.
    */
   async checkIn(userId: string, dto: CheckInDto) {
-    const session = await this.prisma.$transaction(async (tx) => {
-      // RN-002 — una sola sesión activa por usuario
-      const active = await tx.parkingSession.findFirst({
-        where: { userId, status: SessionStatus.ACTIVE },
-        include: SESSION_INCLUDE,
-      });
-
-      if (active) {
+    try {
+      return await this.runCheckIn(userId, dto);
+    } catch (error) {
+      // Doble pulsación simultánea: ambas eligieron el mismo cupo y el índice
+      // único rechazó una. Sin esto el usuario vería un mensaje sobre columnas.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002' &&
+        JSON.stringify(error.meta ?? {}).includes('slot')
+      ) {
         throw new ConflictException({
           code: 'USER_ALREADY_HAS_ACTIVE_SESSION',
-          message: `Ya tiene una sesión activa en el puesto ${active.parkingSpace.code}. Libérelo antes de registrar otro.`,
+          message:
+            'Ya se registró otro puesto en este mismo instante. Revise sus estacionamientos activos.',
         });
       }
+      throw error;
+    }
+  }
 
+  private async runCheckIn(userId: string, dto: CheckInDto) {
+    const session = await this.prisma.$transaction(async (tx) => {
       const { category } = await tx.user.findUniqueOrThrow({
         where: { id: userId },
         select: { category: true },
       });
+
+      // RN-002 — tope de sesiones activas según la categoría
+      const limit = ACTIVE_SESSION_LIMIT[category];
+
+      const active = await tx.parkingSession.findMany({
+        where: { userId, status: SessionStatus.ACTIVE },
+        include: SESSION_INCLUDE,
+        orderBy: { slot: 'asc' },
+      });
+
+      if (active.length >= limit) {
+        const ocupados = active.map((s) => s.parkingSpace.code).join(' y ');
+        throw new ConflictException({
+          code: 'USER_ALREADY_HAS_ACTIVE_SESSION',
+          message:
+            limit === 1
+              ? `Ya tiene una sesión activa en el puesto ${ocupados}. Libérelo antes de registrar otro.`
+              : `Ya tiene ${limit} puestos registrados (${ocupados}), que es su máximo. Libere uno antes de registrar otro.`,
+          activeSpaces: active.map((s) => s.parkingSpace.code),
+          limit,
+        });
+      }
+
+      // Primer cupo libre. Si dos peticiones simultáneas eligen el mismo, el
+      // índice único rechaza una y su transacción se deshace entera.
+      const used = new Set(active.map((s) => s.slot));
+      const slot = Array.from({ length: limit }, (_, i) => i + 1).find(
+        (n) => !used.has(n),
+      )!;
 
       // RN-001, RN-003, RN-004 y RN-014: una sola escritura atómica.
       // Solo un puesto AVAILABLE, de una zona y un estacionamiento activos y
@@ -119,6 +174,7 @@ export class ParkingSessionsService {
           userId,
           parkingSpaceId: dto.parkingSpaceId,
           reservationId,
+          slot,
           source: dto.source,
           notes: dto.notes,
         },
@@ -127,7 +183,7 @@ export class ParkingSessionsService {
     });
 
     this.logger.log(
-      `Check-in: usuario ${userId} → puesto ${session.parkingSpace.code}`,
+      `Check-in: usuario ${userId} → puesto ${session.parkingSpace.code} (cupo ${session.slot})`,
     );
     return session;
   }
@@ -359,12 +415,23 @@ export class ParkingSessionsService {
     return reservation ? SpaceStatus.RESERVED : SpaceStatus.AVAILABLE;
   }
 
-  /** Sesión activa del usuario, o null (pantalla 05). */
-  findMyActive(userId: string) {
-    return this.prisma.parkingSession.findFirst({
+  /**
+   * Puestos que el usuario tiene registrados ahora (pantalla 05), junto con su
+   * tope. La interfaz necesita el tope para saber si ofrecer registrar otro.
+   */
+  async findMyActive(userId: string) {
+    const { category } = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { category: true },
+    });
+
+    const sessions = await this.prisma.parkingSession.findMany({
       where: { userId, status: SessionStatus.ACTIVE },
       include: SESSION_INCLUDE,
+      orderBy: { slot: 'asc' },
     });
+
+    return { limit: ACTIVE_SESSION_LIMIT[category], sessions };
   }
 
   /** Historial personal (pantalla 06, CU-005). */

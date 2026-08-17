@@ -215,9 +215,9 @@ model ParkingSpace {
 }
 
 /// RN-001 y RN-002 se aplican con dos índices únicos PARCIALES creados a mano
-/// en la migración 20260817173402_active_session_partial_unique_indexes:
-///   - parking_sessions_one_active_per_user  ("userId"          WHERE status = 'ACTIVE')
-///   - parking_sessions_one_active_per_space ("parkingSpaceId"  WHERE status = 'ACTIVE')
+/// (migraciones ..._active_session_partial_unique_indexes y ..._session_slots):
+///   - parking_sessions_one_active_per_user_slot ("userId","slot" WHERE status = 'ACTIVE')
+///   - parking_sessions_one_active_per_space     ("parkingSpaceId" WHERE status = 'ACTIVE')
 /// Prisma no puede expresar la cláusula WHERE, así que no aparecen abajo.
 /// IMPORTANTE: si `prisma migrate dev` propone eliminarlos, no aceptar.
 model ParkingSession {
@@ -225,6 +225,9 @@ model ParkingSession {
   userId         String
   parkingSpaceId String
   reservationId  String?
+  /// Cupo del usuario que ocupa esta sesión (1..N según su categoría).
+  /// Ver la migración 20260817220000_session_slots.
+  slot           Int           @default(1)
   checkInAt      DateTime      @default(now())
   checkOutAt     DateTime?
   status         SessionStatus @default(ACTIVE)

@@ -1,13 +1,13 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { MaintenanceController } from './maintenance.controller';
+import { MaintenanceService } from './maintenance.service';
+import { MaintenanceScheduler } from './maintenance.scheduler';
+import { ParkingSpacesModule } from '../parking-spaces/parking-spaces.module';
 
-/**
- * Módulo Maintenance
- * Se implementará en sprints posteriores.
- * Estructura base creada en Sprint 0.
- */
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  imports: [ParkingSpacesModule],
+  controllers: [MaintenanceController],
+  providers: [MaintenanceService, MaintenanceScheduler],
+  exports: [MaintenanceService],
 })
 export class MaintenanceModule {}

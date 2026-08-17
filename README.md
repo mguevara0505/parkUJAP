@@ -103,18 +103,22 @@ Son dos ejes independientes: el **rol** decide qué puede hacer en el sistema, l
 | `USER` | Estudiante/profesor/empleado — registra su estacionamiento |
 | `ADMIN` | Administrador — gestiona puestos, reservas y visitantes |
 
-| Categoría | Zonas propias |
-|-----------|---------------|
-| `STUDENT` | A, B, C, D |
-| `PROFESSOR` | E, F, G |
-| `STAFF` | H |
+| Categoría | Zonas propias | Puestos a la vez |
+|-----------|---------------|------------------|
+| `STUDENT` | A, B, C, D | 2 |
+| `PROFESSOR` | E, F, G | 1 |
+| `STAFF` | H | 1 |
 
 Las zonas **I y J** no admiten registro por iniciativa propia: se acceden solo
 mediante una reserva administrativa (autoridades, proveedores, visitantes y
 eventos). Un usuario con una reserva a su nombre sí puede ocupar el puesto
 reservado, sea cual sea la zona.
 
-El reparto se cambia desde **Zonas** en el panel de administración: cada zona
+Un estudiante puede necesitar dos puestos (coche y moto, o un vehículo
+compartido); a profesores y administrativos les corresponde uno. El tope lo
+impone un índice único de PostgreSQL sobre el cupo, no un contador en código.
+
+Las categorías se asignan desde **Usuarios** y el reparto de zonas desde **Zonas**: cada zona
 tiene interruptores por categoría, y dejarlas todas apagadas la convierte en
 zona de reserva exclusiva. La regla la aplica el backend, no solo la interfaz.
 
@@ -168,8 +172,8 @@ ujap-parking/
 | 6 | Concurrencia | ✅ Completado |
 | 7 | Reservas administrativas | ✅ Completado |
 | 8 | Visitantes y eventos | ✅ Completado |
-| 9 | Bloqueos y mantenimiento | ⏳ En curso |
-| 10 | Dashboard + Auditoría | ⏳ Pendiente |
+| 9 | Bloqueos y mantenimiento | ✅ Completado |
+| 10 | Dashboard + Auditoría | ⏳ En curso |
 | 11 | QA + Seguridad + Performance | ⏳ Pendiente |
 | 12 | Deploy MVP | ⏳ Pendiente |
 

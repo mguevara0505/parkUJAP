@@ -6,14 +6,15 @@ import { useCrud } from '@/lib/use-crud';
 import { useParkingMap } from '@/components/parking/use-parking-map';
 import {
   formatDuration,
-  useActiveSession,
+  useActiveSessions,
   type ParkingSession,
 } from '@/lib/sessions';
 
 /** Pantalla 02 — Inicio del usuario universitario. */
 export default function UserDashboardPage() {
   const { user } = useAuthStore();
-  const { session } = useActiveSession();
+  const { sessions, limit, canRegisterMore } = useActiveSessions();
+  const session = sessions[0];
   const { counts, total, zones } = useParkingMap();
   const { total: visits } = useCrud<ParkingSession>(
     '/parking-sessions/me/history',
@@ -52,12 +53,28 @@ export default function UserDashboardPage() {
             {session ? (
               <>
                 <p className="text-white font-semibold text-lg mt-0.5">
-                  Puesto{' '}
-                  <span className="font-mono">{session.parkingSpace.code}</span>{' '}
-                  · {session.parkingSpace.zone.name}
+                  {sessions.length === 1 ? (
+                    <>
+                      Puesto{' '}
+                      <span className="font-mono">
+                        {session.parkingSpace.code}
+                      </span>{' '}
+                      · {session.parkingSpace.zone.name}
+                    </>
+                  ) : (
+                    <>
+                      Puestos{' '}
+                      <span className="font-mono">
+                        {sessions.map((s) => s.parkingSpace.code).join(' y ')}
+                      </span>
+                    </>
+                  )}
                 </p>
                 <p className="text-green-400 text-xs mt-1">
-                  Estacionado hace {formatDuration(session.checkInAt)}
+                  {sessions.length === 1
+                    ? `Estacionado hace ${formatDuration(session.checkInAt)}`
+                    : `${sessions.length} de ${limit} puestos registrados`}
+                  {canRegisterMore && limit > 1 && ' · puede registrar otro'}
                 </p>
               </>
             ) : (

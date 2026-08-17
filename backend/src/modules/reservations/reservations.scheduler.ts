@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ReservationStatus, SessionStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { ReservationsService } from './reservations.service';
+import { SpaceStatusService } from '../parking-spaces/space-status.service';
 
 /**
  * Jobs programados de la sección 45, cada minuto.
@@ -17,7 +17,7 @@ export class ReservationsScheduler {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly reservations: ReservationsService,
+    private readonly spaceStatus: SpaceStatusService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -85,9 +85,7 @@ export class ReservationsScheduler {
     }
 
     // 3. Devolver cada puesto afectado al estado que le corresponde
-    for (const parkingSpaceId of touched) {
-      await this.reservations.syncSpaceStatus(parkingSpaceId);
-    }
+    await this.spaceStatus.syncMany(touched);
 
     if (touched.size > 0) {
       this.logger.log(

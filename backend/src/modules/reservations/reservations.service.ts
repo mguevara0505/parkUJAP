@@ -4,18 +4,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  MaintenanceStatus,
-  Prisma,
-  ReservationStatus,
-  SessionStatus,
-  SpaceStatus,
-} from '@prisma/client';
+import { Prisma, ReservationStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ReservationQueryDto } from './dto/reservation-query.dto';
+import { SpaceStatusService } from '../parking-spaces/space-status.service';
 
 /**
  * Zona horaria de la universidad. Los mensajes de error los lee una persona
@@ -70,7 +65,10 @@ const RESERVATION_INCLUDE = {
 export class ReservationsService {
   private readonly logger = new Logger(ReservationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly spaceStatus: SpaceStatusService,
+  ) {}
 
   /**
    * Crea una reserva anticipada (CU-007).
@@ -111,7 +109,7 @@ export class ReservationsService {
       );
 
       // Si el período ya empezó, el puesto debe protegerse de inmediato
-      await this.syncSpaceStatus(reservation.parkingSpaceId);
+      await this.spaceStatus.sync(reservation.parkingSpaceId);
 
       return this.findOne(reservation.id);
     } catch (error) {
@@ -271,7 +269,7 @@ export class ReservationsService {
       throw error;
     }
 
-    await this.syncSpaceStatus(existing.parkingSpaceId);
+    await this.spaceStatus.sync(existing.parkingSpaceId);
     return this.findOne(id);
   }
 
@@ -299,7 +297,7 @@ export class ReservationsService {
     });
 
     // Al dejar de proteger el puesto, este vuelve a estar disponible
-    await this.syncSpaceStatus(existing.parkingSpaceId);
+    await this.spaceStatus.sync(existing.parkingSpaceId);
 
     this.logger.log(`Reserva cancelada: ${existing.parkingSpace.code}`);
     return this.findOne(id);
@@ -326,7 +324,7 @@ export class ReservationsService {
       data: { status: ReservationStatus.ACTIVE },
     });
 
-    await this.syncSpaceStatus(existing.parkingSpaceId);
+    await this.spaceStatus.sync(existing.parkingSpaceId);
     return this.findOne(id);
   }
 
@@ -348,7 +346,7 @@ export class ReservationsService {
       data: { status: ReservationStatus.COMPLETED },
     });
 
-    await this.syncSpaceStatus(existing.parkingSpaceId);
+    await this.spaceStatus.sync(existing.parkingSpaceId);
     return this.findOne(id);
   }
 
@@ -365,65 +363,5 @@ export class ReservationsService {
         endAt: { gt: at },
       },
     });
-  }
-
-  /**
-   * Recalcula el estado del puesto a partir de la realidad: ocupación >
-   * mantenimiento > reserva vigente > disponible.
-   *
-   * Nunca toca un puesto OCCUPIED ni DISABLED: el primero tiene a alguien
-   * dentro y el segundo lo apagó un administrador a propósito.
-   */
-  async syncSpaceStatus(parkingSpaceId: string): Promise<SpaceStatus> {
-    const now = new Date();
-
-    const space = await this.prisma.parkingSpace.findUnique({
-      where: { id: parkingSpaceId },
-      select: { status: true },
-    });
-
-    if (
-      !space ||
-      space.status === SpaceStatus.OCCUPIED ||
-      space.status === SpaceStatus.DISABLED
-    ) {
-      return space?.status ?? SpaceStatus.AVAILABLE;
-    }
-
-    const [session, maintenance, reservation] = await Promise.all([
-      this.prisma.parkingSession.findFirst({
-        where: { parkingSpaceId, status: SessionStatus.ACTIVE },
-        select: { id: true },
-      }),
-      this.prisma.maintenanceBlock.findFirst({
-        where: {
-          parkingSpaceId,
-          status: {
-            in: [MaintenanceStatus.SCHEDULED, MaintenanceStatus.ACTIVE],
-          },
-          startAt: { lte: now },
-          endAt: { gt: now },
-        },
-        select: { id: true },
-      }),
-      this.liveReservationAt(parkingSpaceId, now),
-    ]);
-
-    const next = session
-      ? SpaceStatus.OCCUPIED
-      : maintenance
-        ? SpaceStatus.MAINTENANCE
-        : reservation
-          ? SpaceStatus.RESERVED
-          : SpaceStatus.AVAILABLE;
-
-    if (next !== space.status) {
-      await this.prisma.parkingSpace.update({
-        where: { id: parkingSpaceId },
-        data: { status: next },
-      });
-    }
-
-    return next;
   }
 }

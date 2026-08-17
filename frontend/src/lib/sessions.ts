@@ -54,19 +54,25 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+interface ActivePayload {
+  /** Cuántos puestos puede tener a la vez, según su categoría. */
+  limit: number;
+  sessions: ParkingSession[];
+}
+
 /**
- * Sesión activa del usuario. `null` significa "sin sesión"; `undefined`,
- * "todavía cargando" — distinguirlos evita mostrar "no tienes puesto" un
- * instante antes de que llegue la respuesta.
+ * Puestos que el usuario tiene registrados ahora.
+ *
+ * `loaded` distingue "todavía cargando" de "ninguno": sin él se mostraría
+ * "no tiene puesto" un instante antes de que llegue la respuesta.
  */
-export function useActiveSession() {
-  const [session, setSession] = useState<ParkingSession | null | undefined>(
-    undefined,
-  );
+export function useActiveSessions() {
+  const [state, setState] = useState<ActivePayload>({ limit: 1, sessions: [] });
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await api.get<{ data: ParkingSession | null }>(
+    const { data } = await api.get<{ data: ActivePayload }>(
       '/parking-sessions/me/active',
     );
     return data.data;
@@ -76,14 +82,16 @@ export function useActiveSession() {
     let cancelled = false;
 
     void load()
-      .then((s) => {
-        if (!cancelled) setSession(s);
+      .then((payload) => {
+        if (!cancelled) setState(payload);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setSession(null);
           setError(errorMessage(err, 'No se pudo consultar su estacionamiento'));
         }
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
       });
 
     return () => {
@@ -93,12 +101,20 @@ export function useActiveSession() {
 
   const reload = useCallback(async () => {
     try {
-      setSession(await load());
+      setState(await load());
       setError(null);
     } catch (err) {
       setError(errorMessage(err, 'No se pudo consultar su estacionamiento'));
     }
   }, [load]);
 
-  return { session, error, reload, setSession };
+  return {
+    sessions: state.sessions,
+    limit: state.limit,
+    /** Si ya llegó a su tope, no tiene sentido ofrecerle registrar otro. */
+    canRegisterMore: state.sessions.length < state.limit,
+    loaded,
+    error,
+    reload,
+  };
 }

@@ -10,7 +10,7 @@ import { ParkingLegend } from '@/components/parking/ParkingLegend';
 import { ParkingFilters } from '@/components/parking/ParkingFilters';
 import { SpaceDetail } from '@/components/parking/SpaceDetail';
 import { useParkingMap } from '@/components/parking/use-parking-map';
-import { errorMessage, useActiveSession } from '@/lib/sessions';
+import { errorMessage, useActiveSessions } from '@/lib/sessions';
 import { useAuthStore } from '@/store/auth.store';
 import {
   CATEGORY_SINGULAR,
@@ -35,7 +35,12 @@ export default function UserMapPage() {
     patchSpace,
   } = useParkingMap();
 
-  const { session, reload: reloadSession } = useActiveSession();
+  const {
+    sessions,
+    limit,
+    canRegisterMore,
+    reload: reloadSession,
+  } = useActiveSessions();
   const { user } = useAuthStore();
 
   const [selected, setSelected] = useState<MapSpace | null>(null);
@@ -109,15 +114,17 @@ export default function UserMapPage() {
         )}
       </header>
 
-      {session && (
+      {sessions.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-3 p-4 rounded-2xl bg-blue-600/10 border border-blue-500/20">
           <span className="text-xl">🚗</span>
           <p className="text-sm text-slate-300 flex-1">
-            Ya tiene registrado el puesto{' '}
+            Ya tiene registrado{sessions.length > 1 ? 's los puestos' : ' el puesto'}{' '}
             <span className="font-mono text-white">
-              {session.parkingSpace.code}
+              {sessions.map((s) => s.parkingSpace.code).join(' y ')}
             </span>
-            . Libérelo antes de registrar otro.
+            {canRegisterMore
+              ? `. Puede registrar ${limit - sessions.length} más.`
+              : '. Libere uno antes de registrar otro.'}
           </p>
           <Link
             href="/dashboard/my-parking"
@@ -183,9 +190,12 @@ export default function UserMapPage() {
                   <p className="text-xs text-slate-500">
                     Solo puede registrar puestos disponibles.
                   </p>
-                ) : session ? (
+                ) : !canRegisterMore ? (
                   <p className="text-xs text-slate-500">
-                    Libere primero el puesto {session.parkingSpace.code}.
+                    Ya tiene {limit === 1 ? 'un puesto' : `sus ${limit} puestos`}{' '}
+                    registrado{limit > 1 ? 's' : ''} (
+                    {sessions.map((s) => s.parkingSpace.code).join(', ')}). Libere
+                    uno antes de registrar otro.
                   </p>
                 ) : confirming ? (
                   <div className="space-y-2">
