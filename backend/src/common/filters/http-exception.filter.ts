@@ -40,12 +40,17 @@ function uniqueConstraintFields(
  * Traduce errores conocidos de Prisma al formato de error de la sección 31.
  * Vive en el filtro global para que ningún módulo tenga que repetir este mapeo.
  * Referencia de códigos: https://www.prisma.io/docs/reference/api-reference/error-reference
+ *
+ * Exportada para poder probar la tabla de correspondencias sin tumbar la base
+ * de datos en un test.
  */
-function translatePrismaError(e: Prisma.PrismaClientKnownRequestError) {
+export function translatePrismaError(e: { code: string; meta?: unknown }) {
   switch (e.code) {
     case 'P2002': {
       // Violación de restricción única — p. ej. dos puestos con el mismo código
-      const fields = uniqueConstraintFields(e.meta);
+      const fields = uniqueConstraintFields(
+        e.meta as Record<string, unknown> | undefined,
+      );
       return {
         statusCode: HttpStatus.CONFLICT,
         error: 'Conflict',
@@ -78,11 +83,25 @@ function translatePrismaError(e: Prisma.PrismaClientKnownRequestError) {
           'La operación rompería una relación existente. Desactive el registro en lugar de eliminarlo',
       };
     default:
+      // Solo los errores de consulta (P2xxx) pueden deberse a datos del
+      // cliente. Los P1xxx y los del driver (ECONNREFUSED, ETIMEDOUT) son
+      // fallos de infraestructura: devolver 400 culparía al cliente de que la
+      // base de datos esté caída, y ocultaría la caída en las métricas.
+      if (e.code.startsWith('P2')) {
+        return {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Internal Server Error',
+          code: `PRISMA_${e.code}`,
+          message: 'La operación no pudo completarse en la base de datos',
+        };
+      }
+
       return {
-        statusCode: HttpStatus.BAD_REQUEST,
-        error: 'Bad Request',
-        code: `PRISMA_${e.code}`,
-        message: 'La operación no pudo completarse en la base de datos',
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        error: 'Service Unavailable',
+        code: 'DATABASE_UNAVAILABLE',
+        message:
+          'La base de datos no está disponible en este momento. Intente nuevamente en unos instantes',
       };
   }
 }

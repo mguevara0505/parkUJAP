@@ -83,6 +83,26 @@ export const ADMIN_SETTABLE_STATUSES: SpaceStatus[] = [
   'MAINTENANCE',
 ];
 
+/**
+ * Puesto tal como lo devuelve GET /parking-spaces/map: exactamente los campos
+ * necesarios para dibujarlo, sin relaciones (sección 46).
+ */
+export interface MapSpace {
+  id: string;
+  code: string;
+  status: SpaceStatus;
+  type: SpaceType;
+  zoneId: string;
+  priority: number;
+  isAccessible: boolean;
+  isCovered: boolean;
+  positionX: number;
+  positionY: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+
 export interface ParkingSpace {
   id: string;
   code: string;

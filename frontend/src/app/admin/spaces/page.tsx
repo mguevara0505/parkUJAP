@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useCrud } from '@/lib/use-crud';
 import { Alert, SelectField } from '@/components/admin-ui';
+import { SpaceDetail } from '@/components/parking/SpaceDetail';
 import {
-  ADMIN_SETTABLE_STATUSES,
   PRIORITY_LABELS,
   STATUS_META,
   TYPE_LABELS,
@@ -225,98 +225,26 @@ export default function AdminSpacesPage() {
           )}
         </section>
 
-        {/* Detalle — pantalla A03 */}
-        <aside className="bg-white/5 border border-white/10 rounded-2xl p-6 h-fit">
-          <h2 className="text-white font-semibold mb-4">Detalle del puesto</h2>
-
-          {!selected ? (
-            <p className="text-slate-400 text-sm">
-              Seleccione un puesto de la lista para ver sus datos y acciones.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              <dl className="space-y-2 text-sm">
-                <Row label="Código" value={selected.code} mono />
-                <Row
-                  label="Zona"
-                  value={
-                    selected.zone
-                      ? `${selected.zone.code} — ${selected.zone.name}`
-                      : '—'
-                  }
-                />
-                <Row
-                  label="Estacionamiento"
-                  value={selected.zone?.parkingLot?.name ?? '—'}
-                />
-                <Row label="Tipo" value={TYPE_LABELS[selected.type]} />
-                <Row
-                  label="Prioridad"
-                  value={PRIORITY_LABELS[selected.priority] ?? String(selected.priority)}
-                />
-                <Row label="Accesible" value={selected.isAccessible ? 'Sí' : 'No'} />
-                <Row label="Cubierto" value={selected.isCovered ? 'Sí' : 'No'} />
-                <div className="flex justify-between gap-4 py-1">
-                  <dt className="text-slate-400">Estado</dt>
-                  <dd>
-                    <StatusChip status={selected.status} />
-                  </dd>
-                </div>
-              </dl>
-
-              <div className="pt-4 border-t border-white/5">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  Cambiar estado
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {ADMIN_SETTABLE_STATUSES.map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => void changeStatus(selected, status)}
-                      disabled={selected.status === status}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${STATUS_META[status].className}`}
-                    >
-                      {STATUS_META[status].icon} {STATUS_META[status].label}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs text-slate-500">
-                  Ocupado y Reservado no se fijan a mano: los gestionan el
-                  registro de ocupación y las reservas.
-                </p>
-              </div>
-
-              {selected.status !== 'DISABLED' && (
-                <button
-                  onClick={() => void remove(selected.id)}
-                  className="w-full px-3 py-2 rounded-xl text-xs font-medium text-slate-300 bg-white/5 hover:bg-red-500/10 hover:text-red-400 border border-white/10 transition-colors"
-                >
-                  Deshabilitar puesto
-                </button>
-              )}
-            </div>
-          )}
-        </aside>
+        {/* Detalle — pantalla A03, mismo panel que usa el mapa */}
+        <div className="h-fit">
+          <SpaceDetail
+            space={selected}
+            zoneLabel={
+              selected?.zone
+                ? `${selected.zone.code} — ${selected.zone.name}`
+                : undefined
+            }
+            lotLabel={selected?.zone?.parkingLot?.name}
+            emptyHint="Seleccione un puesto de la lista para ver sus datos y acciones."
+            onChangeStatus={(status) => {
+              if (selected) void changeStatus(selected, status);
+            }}
+            onDisable={() => {
+              if (selected) void remove(selected.id);
+            }}
+          />
+        </div>
       </div>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex justify-between gap-4 py-1">
-      <dt className="text-slate-400">{label}</dt>
-      <dd className={`text-white text-right ${mono ? 'font-mono' : ''}`}>
-        {value}
-      </dd>
     </div>
   );
 }

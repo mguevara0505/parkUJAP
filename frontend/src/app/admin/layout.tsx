@@ -40,11 +40,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!user || !isAdmin()) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 border-r border-white/5 flex flex-col">
+    <div className="min-h-screen bg-slate-950 flex flex-col lg:flex-row">
+      {/* Barra lateral en escritorio; arriba y horizontal en móvil (sección 48):
+          con 256px fijos en una pantalla de 375px el contenido quedaba en 119px */}
+      <aside className="w-full lg:w-64 shrink-0 bg-slate-900 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col">
         {/* Logo */}
-        <div className="p-6 border-b border-white/5">
+        <div className="p-4 lg:p-6 lg:border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
               <span className="text-lg">🅿️</span>
@@ -57,14 +58,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-4 space-y-1">
+        {/* En móvil se desplaza horizontalmente; en escritorio es una columna */}
+        <nav className="flex-1 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible p-2 lg:p-4">
           {adminNav.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 lg:gap-3 shrink-0 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-blue-600/20 text-blue-400 border border-blue-500/20'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -78,8 +80,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* User info + logout */}
-        <div className="p-4 border-t border-white/5">
-          <div className="flex items-center gap-3 mb-3 px-2">
+        <div className="p-4 border-t border-white/5 flex lg:block items-center gap-3">
+          <div className="flex items-center gap-3 lg:mb-3 px-2 flex-1 min-w-0">
             <div className="w-8 h-8 rounded-full bg-blue-600/30 flex items-center justify-center">
               <span className="text-xs font-bold text-blue-300">
                 {user.firstName?.[0]}{user.lastName?.[0]}
@@ -95,7 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button
             id="btn-admin-logout"
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-sm transition-all"
+            className="shrink-0 lg:w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-sm transition-all"
           >
             <span>🚪</span> Cerrar sesión
           </button>
