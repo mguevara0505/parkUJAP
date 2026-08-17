@@ -72,7 +72,7 @@ export class ParkingSessionsService {
         });
       }
 
-      // RN-001, RN-003, RN-004, RN-005 y RN-014: una sola escritura atómica.
+      // RN-001, RN-003, RN-004 y RN-014: una sola escritura atómica.
       // Solo un puesto AVAILABLE, de una zona y un estacionamiento activos,
       // puede pasar a OCCUPIED.
       const { count } = await tx.parkingSpace.updateMany({
@@ -84,14 +84,27 @@ export class ParkingSessionsService {
         data: { status: SpaceStatus.OCCUPIED },
       });
 
+      // RN-005 — el puesto reservado lo bloquea "otro usuario", no su titular.
+      // Sin esto, un profesor con puesto reservado no podría registrarlo.
+      let reservationId: string | undefined;
+
       if (count === 0) {
-        await this.explainWhyUnavailable(tx, dto.parkingSpaceId);
+        reservationId = await this.claimOwnReservation(
+          tx,
+          dto.parkingSpaceId,
+          userId,
+        );
+
+        if (!reservationId) {
+          await this.explainWhyUnavailable(tx, dto.parkingSpaceId);
+        }
       }
 
       return tx.parkingSession.create({
         data: {
           userId,
           parkingSpaceId: dto.parkingSpaceId,
+          reservationId,
           source: dto.source,
           notes: dto.notes,
         },
@@ -103,6 +116,48 @@ export class ParkingSessionsService {
       `Check-in: usuario ${userId} → puesto ${session.parkingSpace.code}`,
     );
     return session;
+  }
+
+  /**
+   * RN-005 — permite ocupar un puesto RESERVED si la reserva vigente es del
+   * propio usuario. Devuelve el id de la reserva, o undefined si no le
+   * corresponde.
+   *
+   * Sigue siendo atómico: el UPDATE exige status RESERVED, así que si el job
+   * o un administrador cambian el estado a la vez, esta petición pierde.
+   */
+  private async claimOwnReservation(
+    tx: Prisma.TransactionClient,
+    parkingSpaceId: string,
+    userId: string,
+  ): Promise<string | undefined> {
+    const now = new Date();
+
+    const reservation = await tx.reservation.findFirst({
+      where: {
+        parkingSpaceId,
+        userId,
+        status: {
+          in: [ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE],
+        },
+        startAt: { lte: now },
+        endAt: { gt: now },
+      },
+      select: { id: true },
+    });
+
+    if (!reservation) return undefined;
+
+    const { count } = await tx.parkingSpace.updateMany({
+      where: {
+        id: parkingSpaceId,
+        status: SpaceStatus.RESERVED,
+        zone: { isActive: true, parkingLot: { isActive: true } },
+      },
+      data: { status: SpaceStatus.OCCUPIED },
+    });
+
+    return count === 1 ? reservation.id : undefined;
   }
 
   /**
@@ -138,6 +193,13 @@ export class ParkingSessionsService {
       throw new ConflictException({
         code: 'PARKING_SPACE_NOT_AVAILABLE',
         message: `El puesto ${space.code} pertenece a una zona o estacionamiento fuera de servicio`,
+      });
+    }
+
+    if (space.status === SpaceStatus.RESERVED) {
+      throw new ConflictException({
+        code: 'PARKING_SPACE_RESERVED',
+        message: `El puesto ${space.code} está reservado para otra persona en este momento`,
       });
     }
 
@@ -210,34 +272,35 @@ export class ParkingSessionsService {
   ): Promise<SpaceStatus> {
     const now = new Date();
 
-    const [maintenance, reservation] = await Promise.all([
-      tx.maintenanceBlock.findFirst({
-        where: {
-          parkingSpaceId,
-          status: {
-            in: [MaintenanceStatus.SCHEDULED, MaintenanceStatus.ACTIVE],
-          },
-          startAt: { lte: now },
-          endAt: { gt: now },
+    // Secuencial, no Promise.all: una transacción es una única conexión y
+    // lanzar dos consultas a la vez sobre ella es un error del driver.
+    const maintenance = await tx.maintenanceBlock.findFirst({
+      where: {
+        parkingSpaceId,
+        status: {
+          in: [MaintenanceStatus.SCHEDULED, MaintenanceStatus.ACTIVE],
         },
-        select: { id: true },
-      }),
-      tx.reservation.findFirst({
-        where: {
-          parkingSpaceId,
-          status: {
-            in: [ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE],
-          },
-          startAt: { lte: now },
-          endAt: { gt: now },
-        },
-        select: { id: true },
-      }),
-    ]);
+        startAt: { lte: now },
+        endAt: { gt: now },
+      },
+      select: { id: true },
+    });
 
     if (maintenance) return SpaceStatus.MAINTENANCE;
-    if (reservation) return SpaceStatus.RESERVED;
-    return SpaceStatus.AVAILABLE;
+
+    const reservation = await tx.reservation.findFirst({
+      where: {
+        parkingSpaceId,
+        status: {
+          in: [ReservationStatus.CONFIRMED, ReservationStatus.ACTIVE],
+        },
+        startAt: { lte: now },
+        endAt: { gt: now },
+      },
+      select: { id: true },
+    });
+
+    return reservation ? SpaceStatus.RESERVED : SpaceStatus.AVAILABLE;
   }
 
   /** Sesión activa del usuario, o null (pantalla 05). */

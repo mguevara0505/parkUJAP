@@ -1,13 +1,11 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { ReservationsController } from './reservations.controller';
+import { ReservationsService } from './reservations.service';
+import { ReservationsScheduler } from './reservations.scheduler';
 
-/**
- * Módulo Reservations
- * Se implementará en sprints posteriores.
- * Estructura base creada en Sprint 0.
- */
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  controllers: [ReservationsController],
+  providers: [ReservationsService, ReservationsScheduler],
+  exports: [ReservationsService],
 })
 export class ReservationsModule {}

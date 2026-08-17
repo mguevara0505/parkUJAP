@@ -144,8 +144,8 @@ ujap-parking/
 | 4 | Mapa Visual (SVG) | ✅ Completado |
 | 5 | Check-in / Check-out | ✅ Completado |
 | 6 | Concurrencia | ✅ Completado |
-| 7 | Reservas administrativas | ⏳ En curso |
-| 8 | Visitantes y eventos | ⏳ Pendiente |
+| 7 | Reservas administrativas | ✅ Completado |
+| 8 | Visitantes y eventos | ⏳ En curso |
 | 9 | Bloqueos y mantenimiento | ⏳ Pendiente |
 | 10 | Dashboard + Auditoría | ⏳ Pendiente |
 | 11 | QA + Seguridad + Performance | ⏳ Pendiente |

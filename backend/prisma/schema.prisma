@@ -228,6 +228,13 @@ model ParkingSession {
   @@map("parking_sessions")
 }
 
+/// RN-006 se aplica con una restricción EXCLUDE creada a mano en la migración
+/// 20260817185004_reservation_no_overlap_exclusion: dos reservas vigentes
+/// (PENDING, CONFIRMED, ACTIVE) del mismo puesto no pueden solaparse. El rango
+/// es semiabierto, así que las reservas consecutivas sí se permiten (sección 44).
+/// Incluye además un CHECK de endAt > startAt.
+/// Prisma no puede expresar EXCLUDE ni CHECK, así que no aparecen abajo.
+/// IMPORTANTE: si `prisma migrate dev` propone eliminarlos, no aceptar.
 model Reservation {
   id                 String            @id @default(uuid())
   parkingSpaceId     String
