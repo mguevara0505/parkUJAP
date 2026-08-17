@@ -1,48 +1,181 @@
-# parkUJAP
+# UJAP Parking 🚗
 
-This template should help get you started developing with Vue 3 in Vite.
+**Sistema de Gestión y Reserva de Estacionamientos**  
+**Universidad José Antonio Páez**
 
-## Recommended IDE Setup
+---
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## 📋 Descripción
 
-## Recommended Browser Setup
+Plataforma web para gestionar aproximadamente **1.000 puestos de estacionamiento** de la Universidad José Antonio Páez. Permite a usuarios registrar su ocupación y al administrador visualizar el estado global, reservar puestos y gestionar visitantes.
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+---
 
-## Type Support for `.vue` Imports in TS
+## 🧩 Stack Tecnológico
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+| Capa | Tecnología |
+|------|-----------|
+| Backend | NestJS 11 + TypeScript |
+| ORM | Prisma 7 |
+| Base de datos | PostgreSQL 16 |
+| Frontend | Next.js 16 (App Router) + Tailwind CSS |
+| Autenticación | JWT (Access + Refresh) |
+| Documentación | Swagger/OpenAPI |
+| Testing | Jest + Supertest + Playwright |
+| DevOps | Docker + Docker Compose |
 
-## Customize configuration
+---
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## 🚀 Inicio Rápido
 
-## Project Setup
+### Requisitos
 
-```sh
-npm install
+- Node.js >= 20
+- Docker Desktop
+- npm >= 10
+
+### 1. Clonar y configurar entorno
+
+```bash
+# Copiar variables de entorno del backend
+cp backend/.env.example backend/.env.development
 ```
 
-### Compile and Hot-Reload for Development
+### 2. Levantar con Docker Compose
 
-```sh
+```bash
+docker compose up --build
+```
+
+Esto levanta automáticamente:
+- **PostgreSQL** en `localhost:5432`
+- **API NestJS** en `localhost:3001`
+- **Frontend Next.js** en `localhost:3000`
+- **pgAdmin** en `localhost:5050`
+
+### 3. Sin Docker (desarrollo local)
+
+```bash
+# 1. Solo la base de datos en Docker
+docker compose up -d postgres
+
+# 2. Backend
+cd backend
+npm install
+npx prisma migrate deploy   # aplica las migraciones existentes
+npm run seed                # 1 admin + 20 usuarios de prueba
+npm run start:dev
+
+# 3. Frontend (otra terminal)
+cd frontend
+npm install
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+### Credenciales del seed
 
-```sh
-npm run build
+| Rol | Correo | Contraseña |
+|-----|--------|-----------|
+| ADMIN | `admin@ujap.edu.ve` | `Admin1234!` |
+| USER | `carlos.rodriguez@ujap.edu.ve` | `User1234!` |
+
+---
+
+## 📚 URLs
+
+| Servicio | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:3001/api/v1 |
+| Swagger | http://localhost:3001/api/v1/docs |
+| Health | http://localhost:3001/api/v1/health |
+| pgAdmin | http://localhost:5050 |
+
+---
+
+## 👤 Roles
+
+| Rol | Descripción |
+|-----|-------------|
+| `USER` | Estudiante/profesor/empleado — registra su estacionamiento |
+| `ADMIN` | Administrador — gestiona puestos, reservas y visitantes |
+
+---
+
+## 📦 Estructura del Proyecto
+
+```
+ujap-parking/
+├── backend/                    ← NestJS Monolito Modular
+│   ├── src/
+│   │   ├── common/             ← Guards, decorators, filters, interceptors
+│   │   ├── config/             ← Configuración tipada
+│   │   ├── database/           ← Prisma Service + Seeds
+│   │   └── modules/            ← Módulos funcionales
+│   │       ├── auth/
+│   │       ├── users/
+│   │       ├── parking-lots/
+│   │       ├── parking-zones/
+│   │       ├── parking-spaces/
+│   │       ├── parking-sessions/
+│   │       ├── reservations/
+│   │       ├── visitors/
+│   │       ├── maintenance/
+│   │       ├── dashboard/
+│   │       ├── audit/
+│   │       └── health/
+│   └── prisma/
+│       └── schema.prisma       ← Todos los modelos
+├── frontend/                   ← Next.js 16 (src/proxy.ts protege las rutas)
+├── docker-compose.yml
+└── README.md
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+---
 
-```sh
-npm run test:unit
+## 🗓️ Sprints
+
+| Sprint | Descripción | Estado |
+|--------|-------------|--------|
+| 0 | Preparación y estructura base | ✅ Completado |
+| 1 | Autenticación + Usuarios | ✅ Completado |
+| 2 | Estacionamientos + Zonas | ⏳ En curso |
+| 3 | Puestos (~1.000) | ⏳ Pendiente |
+| 4 | Mapa Visual (SVG) | ⏳ Pendiente |
+| 5 | Check-in / Check-out | ⏳ Pendiente |
+| 6 | Concurrencia | ⏳ Pendiente |
+| 7 | Reservas administrativas | ⏳ Pendiente |
+| 8 | Visitantes y eventos | ⏳ Pendiente |
+| 9 | Bloqueos y mantenimiento | ⏳ Pendiente |
+| 10 | Dashboard + Auditoría | ⏳ Pendiente |
+| 11 | QA + Seguridad + Performance | ⏳ Pendiente |
+| 12 | Deploy MVP | ⏳ Pendiente |
+
+---
+
+## 🧪 Tests
+
+```bash
+cd backend
+
+# Unitarios
+npm run test
+
+# Watch mode
+npm run test:watch
+
+# Cobertura
+npm run test:cov
+
+# E2E — requiere PostgreSQL corriendo (docker compose up -d postgres)
+npm run test:e2e
 ```
+
+Los tests E2E crean y borran sus propios usuarios `e2e-*`, así que no dependen del seed
+ni lo modifican.
+
+---
+
+## 📄 Licencia
+
+Proyecto académico — Universidad José Antonio Páez.

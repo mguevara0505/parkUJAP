@@ -1,0 +1,321 @@
+// UJAP Parking — Prisma Schema
+// Fuente: DOCUMENTO_MAESTRO_UJAP_PARKING.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum SpaceType {
+  STANDARD
+  VISITOR
+  PROFESSOR
+  STAFF
+  ACCESSIBLE
+  VIP
+  MOTORCYCLE
+  OTHER
+}
+
+enum SpaceStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  DISABLED
+  MAINTENANCE
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SessionSource {
+  WEB
+  MOBILE
+  ADMIN
+}
+
+enum ReservationType {
+  VISITOR
+  EVENT
+  PROFESSOR
+  AUTHORITY
+  STAFF
+  EXTERNAL
+  OTHER
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum MaintenanceReason {
+  PAINTING
+  MAINTENANCE
+  CONSTRUCTION
+  SECURITY
+  EVENT
+  OTHER
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// MODELOS
+// ─────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(uuid())
+  firstName    String
+  lastName     String
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(USER)
+  universityId String?
+  documentId   String?
+  phone        String?
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relaciones
+  parkingSessions    ParkingSession[]
+  reservationsAdmin  Reservation[]      @relation("AdminReservations")
+  reservationsUser   Reservation[]      @relation("UserReservations")
+  maintenanceBlocks  MaintenanceBlock[]
+  auditLogs          AuditLog[]
+  refreshTokens      RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model ParkingLot {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+  location    String?
+  totalSpaces Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  zones ParkingZone[]
+
+  @@map("parking_lots")
+}
+
+model ParkingZone {
+  id           String   @id @default(uuid())
+  parkingLotId String
+  name         String
+  code         String   @unique
+  description  String?
+  floor        Int?     @default(1)
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  parkingLot ParkingLot     @relation(fields: [parkingLotId], references: [id])
+  spaces     ParkingSpace[]
+
+  @@map("parking_zones")
+}
+
+model ParkingSpace {
+  id           String      @id @default(uuid())
+  zoneId       String
+  code         String      @unique
+  number       Int
+  type         SpaceType   @default(STANDARD)
+  status       SpaceStatus @default(AVAILABLE)
+  isAccessible Boolean     @default(false)
+  isCovered    Boolean     @default(false)
+  priority     Int         @default(3)
+  positionX    Float       @default(0)
+  positionY    Float       @default(0)
+  width        Float       @default(60)
+  height       Float       @default(100)
+  rotation     Float       @default(0)
+  metadata     Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relaciones
+  zone              ParkingZone        @relation(fields: [zoneId], references: [id])
+  sessions          ParkingSession[]
+  reservations      Reservation[]
+  maintenanceBlocks MaintenanceBlock[]
+
+  @@index([status])
+  @@index([zoneId])
+  @@index([code])
+  @@map("parking_spaces")
+}
+
+model ParkingSession {
+  id             String        @id @default(uuid())
+  userId         String
+  parkingSpaceId String
+  reservationId  String?
+  checkInAt      DateTime      @default(now())
+  checkOutAt     DateTime?
+  status         SessionStatus @default(ACTIVE)
+  source         SessionSource @default(WEB)
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relaciones
+  user         User         @relation(fields: [userId], references: [id])
+  parkingSpace ParkingSpace @relation(fields: [parkingSpaceId], references: [id])
+  reservation  Reservation? @relation(fields: [reservationId], references: [id])
+
+  @@index([userId])
+  @@index([parkingSpaceId])
+  @@index([status])
+  @@map("parking_sessions")
+}
+
+model Reservation {
+  id                 String            @id @default(uuid())
+  parkingSpaceId     String
+  createdByAdminId   String
+  visitorId          String?
+  userId             String?
+  title              String
+  description        String?
+  reservationType    ReservationType   @default(VISITOR)
+  startAt            DateTime
+  endAt              DateTime
+  status             ReservationStatus @default(PENDING)
+  priority           Int               @default(3)
+  vehiclePlate       String?
+  vehicleDescription String?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  // Relaciones
+  parkingSpace   ParkingSpace     @relation(fields: [parkingSpaceId], references: [id])
+  createdByAdmin User             @relation("AdminReservations", fields: [createdByAdminId], references: [id])
+  visitor        Visitor?         @relation(fields: [visitorId], references: [id])
+  user           User?            @relation("UserReservations", fields: [userId], references: [id])
+  sessions       ParkingSession[]
+
+  @@index([parkingSpaceId])
+  @@index([startAt])
+  @@index([endAt])
+  @@index([status])
+  @@map("reservations")
+}
+
+model Visitor {
+  id             String   @id @default(uuid())
+  firstName      String
+  lastName       String
+  documentId     String?
+  email          String?
+  phone          String?
+  organization   String?
+  vehiclePlate   String?
+  vehicleBrand   String?
+  vehicleModel   String?
+  vehicleColor   String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relaciones
+  reservations Reservation[]
+
+  @@map("visitors")
+}
+
+model MaintenanceBlock {
+  id             String            @id @default(uuid())
+  parkingSpaceId String
+  createdById    String
+  reason         MaintenanceReason @default(MAINTENANCE)
+  description    String?
+  startAt        DateTime
+  endAt          DateTime
+  status         MaintenanceStatus @default(SCHEDULED)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  // Relaciones
+  parkingSpace ParkingSpace @relation(fields: [parkingSpaceId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@index([parkingSpaceId])
+  @@index([startAt])
+  @@index([endAt])
+  @@map("maintenance_blocks")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  // Relaciones
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

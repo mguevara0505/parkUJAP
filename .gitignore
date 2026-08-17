@@ -1,39 +1,51 @@
-# Logs
-logs
-*.log
+# ─────────────────────────────────────────────
+# UJAP Parking — .gitignore
+# ─────────────────────────────────────────────
+
+# Node
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
+# Entorno (NUNCA commitear archivos .env con secretos)
+.env
+.env.development
+.env.production
+.env.test
+.env.local
+
+# Build
+dist/
+build/
+.next/
+out/
+
+# Prisma
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
-dist
-dist-ssr
-coverage
-*.local
+Thumbs.db
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Docker
+.dockerignore
 
-*.tsbuildinfo
-
-.eslintcache
-
-# Cypress
-/cypress/videos/
-/cypress/screenshots/
-
-# Vitest
-__screenshots__/
-
-# Vite
-*.timestamp-*-*.mjs
+# Temporales
+tmp/
+temp/
