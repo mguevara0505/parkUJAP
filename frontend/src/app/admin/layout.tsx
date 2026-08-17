@@ -11,6 +11,7 @@ const adminNav = [
   { href: '/admin/map', icon: '🗺️', label: 'Mapa de Puestos' },
   { href: '/admin/parking-lots', icon: '🏛️', label: 'Estacionamientos' },
   { href: '/admin/zones', icon: '🔠', label: 'Zonas' },
+  { href: '/admin/spaces', icon: '🚗', label: 'Puestos' },
   { href: '/admin/reservations', icon: '📅', label: 'Reservas' },
   { href: '/admin/visitors', icon: '👥', label: 'Visitantes' },
   { href: '/admin/maintenance', icon: '🔧', label: 'Mantenimiento' },

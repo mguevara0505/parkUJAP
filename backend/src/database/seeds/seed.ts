@@ -1,4 +1,4 @@
-import { PrismaClient, Role, UserStatus } from '@prisma/client';
+import { PrismaClient, Role, SpaceType, UserStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
@@ -118,35 +118,192 @@ async function main() {
   // ────────────────────────────────────────────
   // 4. ZONAS (sección 8.3) — 10 zonas, códigos A..J
   // ────────────────────────────────────────────
+  // `type` y `priority` describen el carácter de cada zona (secciones 8.4 y 17)
   const zones = [
-    { code: 'A', name: 'Zona A', description: 'Cercana al edificio principal' },
-    { code: 'B', name: 'Zona B', description: 'Frente a la biblioteca' },
-    { code: 'C', name: 'Zona C', description: 'Lateral este' },
-    { code: 'D', name: 'Zona D', description: 'Lateral oeste' },
-    { code: 'E', name: 'Zona E', description: 'Área deportiva' },
-    { code: 'F', name: 'Zona F', description: 'Zona techada' },
-    { code: 'G', name: 'Zona G', description: 'Zona de profesores' },
-    { code: 'H', name: 'Zona H', description: 'Zona administrativa' },
-    { code: 'I', name: 'Zona I', description: 'Zona de visitantes' },
-    { code: 'J', name: 'Zona J', description: 'Zona VIP y autoridades' },
+    {
+      code: 'A',
+      name: 'Zona A',
+      description: 'Cercana al edificio principal',
+      type: SpaceType.STANDARD,
+      priority: 2,
+      isCovered: false,
+    },
+    {
+      code: 'B',
+      name: 'Zona B',
+      description: 'Frente a la biblioteca',
+      type: SpaceType.STANDARD,
+      priority: 3,
+      isCovered: false,
+    },
+    {
+      code: 'C',
+      name: 'Zona C',
+      description: 'Lateral este',
+      type: SpaceType.STANDARD,
+      priority: 3,
+      isCovered: false,
+    },
+    {
+      code: 'D',
+      name: 'Zona D',
+      description: 'Lateral oeste',
+      type: SpaceType.STANDARD,
+      priority: 4,
+      isCovered: false,
+    },
+    {
+      code: 'E',
+      name: 'Zona E',
+      description: 'Área deportiva',
+      type: SpaceType.STANDARD,
+      priority: 4,
+      isCovered: false,
+    },
+    {
+      code: 'F',
+      name: 'Zona F',
+      description: 'Zona techada',
+      type: SpaceType.STANDARD,
+      priority: 2,
+      isCovered: true,
+    },
+    {
+      code: 'G',
+      name: 'Zona G',
+      description: 'Zona de profesores',
+      type: SpaceType.PROFESSOR,
+      priority: 2,
+      isCovered: false,
+    },
+    {
+      code: 'H',
+      name: 'Zona H',
+      description: 'Zona administrativa',
+      type: SpaceType.STAFF,
+      priority: 3,
+      isCovered: false,
+    },
+    {
+      code: 'I',
+      name: 'Zona I',
+      description: 'Zona de visitantes',
+      type: SpaceType.VISITOR,
+      priority: 2,
+      isCovered: false,
+    },
+    {
+      code: 'J',
+      name: 'Zona J',
+      description: 'Zona VIP y autoridades',
+      type: SpaceType.VIP,
+      priority: 1,
+      isCovered: true,
+    },
   ];
 
+  const zoneIds = new Map<string, string>();
+
   for (const [index, zone] of zones.entries()) {
-    await prisma.parkingZone.upsert({
+    const created = await prisma.parkingZone.upsert({
       where: { code: zone.code },
       update: {},
       create: {
-        ...zone,
+        code: zone.code,
+        name: zone.name,
+        description: zone.description,
         parkingLotId: lot.id,
         floor: 1,
         sortOrder: index + 1,
       },
     });
 
+    zoneIds.set(zone.code, created.id);
     process.stdout.write(`  🅿️  ${zone.code} → ${zone.name}\n`);
   }
 
   console.log('\n✅ 10 zonas creadas\n');
+
+  // ────────────────────────────────────────────
+  // 5. PUESTOS (sección 8.4) — 100 por zona ≈ 1.000
+  //    Geometría de la sección 19: cada zona es una cuadrícula de 20×5 con
+  //    un pasillo de circulación entre filas. Las coordenadas son absolutas
+  //    dentro del plano del estacionamiento, para dibujarlas en un solo SVG.
+  // ────────────────────────────────────────────
+  const SPACES_PER_ZONE = 100;
+  const COLS = 20;
+  const SPACE_W = 60;
+  const SPACE_H = 100;
+  const GAP_X = 12; // separación entre puestos contiguos
+  const AISLE_H = 60; // pasillo de circulación entre filas
+  const ZONE_GAP_X = 140;
+  const ZONE_GAP_Y = 120;
+  const ZONE_COLS = 2; // las 10 zonas se disponen en 2 columnas × 5 filas
+
+  const zoneW = COLS * SPACE_W + (COLS - 1) * GAP_X;
+  const zoneH =
+    (SPACES_PER_ZONE / COLS) * SPACE_H + (SPACES_PER_ZONE / COLS - 1) * AISLE_H;
+
+  const spaces = zones.flatMap((zone, zoneIndex) => {
+    const originX = (zoneIndex % ZONE_COLS) * (zoneW + ZONE_GAP_X);
+    const originY = Math.floor(zoneIndex / ZONE_COLS) * (zoneH + ZONE_GAP_Y);
+
+    return Array.from({ length: SPACES_PER_ZONE }, (_, i) => {
+      const number = i + 1;
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+
+      // Los 3 primeros de cada zona son accesibles (más cerca del acceso) y
+      // los 5 últimos, de motocicleta
+      const isAccessible = number <= 3;
+      const isMotorcycle = number > SPACES_PER_ZONE - 5;
+
+      const type = isAccessible
+        ? SpaceType.ACCESSIBLE
+        : isMotorcycle
+          ? SpaceType.MOTORCYCLE
+          : zone.type;
+
+      return {
+        zoneId: zoneIds.get(zone.code)!,
+        code: `${zone.code}-${String(number).padStart(3, '0')}`,
+        number,
+        type,
+        isAccessible,
+        isCovered: zone.isCovered,
+        priority: isAccessible ? 1 : zone.priority,
+        positionX: originX + col * (SPACE_W + GAP_X),
+        positionY: originY + row * (SPACE_H + AISLE_H),
+        width: isMotorcycle ? SPACE_W / 2 : SPACE_W,
+        height: SPACE_H,
+        rotation: 0,
+      };
+    });
+  });
+
+  // createMany en una sola consulta: insertar ~1.000 filas de a una tarda
+  // decenas de segundos. skipDuplicates hace el seed reejecutable.
+  const { count } = await prisma.parkingSpace.createMany({
+    data: spaces,
+    skipDuplicates: true,
+  });
+
+  const totalSpaces = await prisma.parkingSpace.count();
+
+  // El plano completo, para referencia del viewBox del mapa (Sprint 4)
+  const planWidth = ZONE_COLS * zoneW + (ZONE_COLS - 1) * ZONE_GAP_X;
+  const planHeight =
+    Math.ceil(zones.length / ZONE_COLS) * zoneH +
+    (Math.ceil(zones.length / ZONE_COLS) - 1) * ZONE_GAP_Y;
+
+  await prisma.parkingLot.update({
+    where: { id: lot.id },
+    data: { totalSpaces },
+  });
+
+  console.log(`✅ ${count} puestos insertados (${totalSpaces} en total)`);
+  console.log(`   Códigos: A-001 … J-100`);
+  console.log(`   Plano: ${planWidth} × ${planHeight} unidades\n`);
 
   console.log('🎉 Seed completado correctamente!\n');
   console.log('─'.repeat(50));
