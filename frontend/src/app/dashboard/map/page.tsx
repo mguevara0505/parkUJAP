@@ -11,7 +11,12 @@ import { ParkingFilters } from '@/components/parking/ParkingFilters';
 import { SpaceDetail } from '@/components/parking/SpaceDetail';
 import { useParkingMap } from '@/components/parking/use-parking-map';
 import { errorMessage, useActiveSession } from '@/lib/sessions';
-import type { MapSpace } from '@/lib/parking';
+import { useAuthStore } from '@/store/auth.store';
+import {
+  CATEGORY_SINGULAR,
+  zoneAudience,
+  type MapSpace,
+} from '@/lib/parking';
 
 /** Pantallas 03 y 04 — mapa y registro de ocupación. */
 export default function UserMapPage() {
@@ -31,6 +36,7 @@ export default function UserMapPage() {
   } = useParkingMap();
 
   const { session, reload: reloadSession } = useActiveSession();
+  const { user } = useAuthStore();
 
   const [selected, setSelected] = useState<MapSpace | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -41,6 +47,15 @@ export default function UserMapPage() {
   const zone = selected
     ? zones.find((z) => z.id === selected.zoneId)
     : undefined;
+
+  const category = user?.category;
+  const myZones = category
+    ? zones.filter((z) => z.allowedCategories.includes(category))
+    : [];
+  // El backend rechazaría el check-in igualmente; aquí solo se evita el intento
+  const zoneIsMine = zone && category
+    ? zone.allowedCategories.includes(category)
+    : true;
 
   const select = (space: MapSpace) => {
     setSelected(space);
@@ -82,6 +97,16 @@ export default function UserMapPage() {
           {available.toLocaleString('es-VE')} de {total.toLocaleString('es-VE')}{' '}
           puestos disponibles ahora
         </p>
+        {category && myZones.length > 0 && (
+          <p className="text-sm text-blue-300 mt-2">
+            Como {CATEGORY_SINGULAR[category].toLowerCase()}, puede estacionarse
+            en{' '}
+            <span className="font-semibold">
+              {myZones.map((z) => z.code).join(', ')}
+            </span>
+            . Las demás zonas aparecen atenuadas.
+          </p>
+        )}
       </header>
 
       {session && (
@@ -122,6 +147,7 @@ export default function UserMapPage() {
               bounds={bounds}
               selectedId={selected?.id}
               onSelect={select}
+              highlightFor={category}
             />
           )}
         </section>
@@ -145,7 +171,15 @@ export default function UserMapPage() {
                 {actionError && <Alert>{actionError}</Alert>}
 
                 {/* Pantalla 04 — registrar estacionamiento */}
-                {selected.status !== 'AVAILABLE' ? (
+                {!zoneIsMine ? (
+                  <p className="text-xs text-slate-500">
+                    {zone && zone.allowedCategories.length === 0
+                      ? `La ${zone.name} es de reserva exclusiva: los puestos se asignan desde una reserva administrativa.`
+                      : `Esta zona es para ${zone ? zoneAudience(zone.allowedCategories).toLowerCase() : 'otra categoría'}.`}
+                    {myZones.length > 0 &&
+                      ` Sus zonas son ${myZones.map((z) => z.code).join(', ')}.`}
+                  </p>
+                ) : selected.status !== 'AVAILABLE' ? (
                   <p className="text-xs text-slate-500">
                     Solo puede registrar puestos disponibles.
                   </p>

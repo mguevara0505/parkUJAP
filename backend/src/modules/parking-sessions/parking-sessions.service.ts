@@ -12,6 +12,7 @@ import {
   Role,
   SessionStatus,
   SpaceStatus,
+  UserCategory,
 } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination.dto';
@@ -72,20 +73,33 @@ export class ParkingSessionsService {
         });
       }
 
+      const { category } = await tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { category: true },
+      });
+
       // RN-001, RN-003, RN-004 y RN-014: una sola escritura atómica.
-      // Solo un puesto AVAILABLE, de una zona y un estacionamiento activos,
-      // puede pasar a OCCUPIED.
+      // Solo un puesto AVAILABLE, de una zona y un estacionamiento activos y
+      // abierta a la categoría del usuario, puede pasar a OCCUPIED. La
+      // restricción de zona viaja en el mismo WHERE para no abrir una carrera
+      // nueva entre comprobarla y escribir.
       const { count } = await tx.parkingSpace.updateMany({
         where: {
           id: dto.parkingSpaceId,
           status: SpaceStatus.AVAILABLE,
-          zone: { isActive: true, parkingLot: { isActive: true } },
+          zone: {
+            isActive: true,
+            parkingLot: { isActive: true },
+            allowedCategories: { has: category },
+          },
         },
         data: { status: SpaceStatus.OCCUPIED },
       });
 
       // RN-005 — el puesto reservado lo bloquea "otro usuario", no su titular.
       // Sin esto, un profesor con puesto reservado no podría registrarlo.
+      // La reserva también salta la restricción de zona: es justo el mecanismo
+      // por el que se accede a las zonas exclusivas de autoridades y eventos.
       let reservationId: string | undefined;
 
       if (count === 0) {
@@ -96,7 +110,7 @@ export class ParkingSessionsService {
         );
 
         if (!reservationId) {
-          await this.explainWhyUnavailable(tx, dto.parkingSpaceId);
+          await this.explainWhyUnavailable(tx, dto.parkingSpaceId, category);
         }
       }
 
@@ -160,14 +174,29 @@ export class ParkingSessionsService {
     return count === 1 ? reservation.id : undefined;
   }
 
+  /** "Sus zonas son A, B, C y D." — vacío si no tiene ninguna asignada. */
+  private suggestZones(zones: { code: string }[]): string {
+    if (zones.length === 0) return '';
+
+    const codes = zones.map((z) => z.code);
+    const list =
+      codes.length === 1
+        ? codes[0]
+        : `${codes.slice(0, -1).join(', ')} y ${codes[codes.length - 1]}`;
+
+    return ` Sus zonas ${codes.length === 1 ? 'es' : 'son'}: ${list}.`;
+  }
+
   /**
-   * Distingue "el puesto no existe" de "está ocupado" o "su zona está
-   * cerrada". Solo se ejecuta cuando el UPDATE atómico ya falló, así que no
-   * introduce ninguna carrera: sirve únicamente para el mensaje de error.
+   * Distingue "el puesto no existe" de "está ocupado", "su zona está cerrada"
+   * o "esa zona no es para su categoría". Solo se ejecuta cuando el UPDATE
+   * atómico ya falló, así que no introduce ninguna carrera: sirve únicamente
+   * para el mensaje de error.
    */
   private async explainWhyUnavailable(
     tx: Prisma.TransactionClient,
     parkingSpaceId: string,
+    category: UserCategory,
   ): Promise<never> {
     const space = await tx.parkingSpace.findUnique({
       where: { id: parkingSpaceId },
@@ -176,7 +205,10 @@ export class ParkingSessionsService {
         status: true,
         zone: {
           select: {
+            code: true,
+            name: true,
             isActive: true,
+            allowedCategories: true,
             parkingLot: { select: { isActive: true } },
           },
         },
@@ -193,6 +225,30 @@ export class ParkingSessionsService {
       throw new ConflictException({
         code: 'PARKING_SPACE_NOT_AVAILABLE',
         message: `El puesto ${space.code} pertenece a una zona o estacionamiento fuera de servicio`,
+      });
+    }
+
+    // La zona no admite a esta categoría. Se comprueba antes que el estado
+    // porque decirle "está ocupado" a quien nunca podría usarlo lo mandaría a
+    // buscar otro puesto de la misma zona una y otra vez.
+    if (!space.zone.allowedCategories.includes(category)) {
+      const mine = await tx.parkingZone.findMany({
+        where: {
+          isActive: true,
+          allowedCategories: { has: category },
+          parkingLot: { isActive: true },
+        },
+        select: { code: true },
+        orderBy: { sortOrder: 'asc' },
+      });
+
+      throw new ConflictException({
+        code: 'ZONE_NOT_ALLOWED_FOR_CATEGORY',
+        message:
+          space.zone.allowedCategories.length === 0
+            ? `La ${space.zone.name} es de reserva exclusiva: los puestos se asignan desde una reserva administrativa.${this.suggestZones(mine)}`
+            : `La ${space.zone.name} no corresponde a su categoría.${this.suggestZones(mine)}`,
+        allowedZones: mine.map((z) => z.code),
       });
     }
 

@@ -1,7 +1,13 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { STATUS_META, TYPE_LABELS, type MapSpace } from '@/lib/parking';
+import {
+  STATUS_META,
+  TYPE_LABELS,
+  zoneAudience,
+  type MapSpace,
+  type UserCategory,
+} from '@/lib/parking';
 import type { MapZone } from './use-parking-map';
 
 /**
@@ -24,6 +30,11 @@ interface Props {
   bounds: { width: number; height: number };
   selectedId?: string | null;
   onSelect: (space: MapSpace) => void;
+  /**
+   * Si se indica, las zonas que no admiten esta categoría se atenúan.
+   * El administrador no la pasa: necesita ver el campus entero por igual.
+   */
+  highlightFor?: UserCategory;
 }
 
 export function ParkingMap({
@@ -32,6 +43,7 @@ export function ParkingMap({
   bounds,
   selectedId,
   onSelect,
+  highlightFor,
 }: Props) {
   // Zoom inicial: que el plano completo entre a lo ancho de un panel típico
   const [zoom, setZoom] = useState(() =>
@@ -82,10 +94,23 @@ export function ParkingMap({
    * selección se dibuja aparte para que elegir un puesto no vuelva a renderizar
    * los ~1.000 rectángulos (sección 59, riesgo 2).
    */
+  /** Zonas donde esta persona puede estacionarse por su cuenta. */
+  const myZoneIds = useMemo(() => {
+    if (!highlightFor) return null;
+    return new Set(
+      zones
+        .filter((z) => z.allowedCategories.includes(highlightFor))
+        .map((z) => z.id),
+    );
+  }, [zones, highlightFor]);
+
   const spaceLayer = useMemo(
     () =>
       spaces.map((s) => {
         const meta = STATUS_META[s.status];
+        // Atenuar lo que no le corresponde guía la vista sin ocultar el campus
+        const mine = !myZoneIds || myZoneIds.has(s.zoneId);
+
         return (
           <g key={s.id}>
             <rect
@@ -96,7 +121,7 @@ export function ParkingMap({
               height={s.height}
               rx={5}
               fill={meta.fill}
-              fillOpacity={0.85}
+              fillOpacity={mine ? 0.85 : 0.18}
               stroke="#0f172a"
               strokeWidth={1.5}
               style={{ cursor: 'pointer' }}
@@ -110,6 +135,7 @@ export function ParkingMap({
                   // El tipo ACCESSIBLE ya lo dice: no repetirlo
                   s.isAccessible && s.type !== 'ACCESSIBLE' ? 'Accesible' : null,
                   s.isCovered ? 'Cubierto' : null,
+                  mine ? null : 'No corresponde a su categoría',
                 ]
                   .filter(Boolean)
                   .join(' — ')}
@@ -132,7 +158,7 @@ export function ParkingMap({
           </g>
         );
       }),
-    [spaces, showLabels],
+    [spaces, showLabels, myZoneIds],
   );
 
   const selected = selectedId
@@ -225,32 +251,38 @@ export function ParkingMap({
           className="focus:outline-none focus:ring-2 focus:ring-blue-500/60"
         >
           {/* Fondo y etiqueta de cada zona */}
-          {zoneBoxes.map(({ zone, box }) => (
-            <g key={zone.id}>
-              <rect
-                x={box.minX - 24}
-                y={box.minY - 56}
-                width={box.maxX - box.minX + 48}
-                height={box.maxY - box.minY + 80}
-                rx={16}
-                fill="#ffffff"
-                fillOpacity={0.04}
-                stroke="#ffffff"
-                strokeOpacity={0.12}
-                strokeWidth={2}
-              />
-              <text
-                x={box.minX - 8}
-                y={box.minY - 22}
-                fontSize={34}
-                fill="#94a3b8"
-                fontWeight={700}
-              >
-                {zone.code} — {zone.name}
-                {!zone.isActive && ' (inactiva)'}
-              </text>
-            </g>
-          ))}
+          {zoneBoxes.map(({ zone, box }) => {
+            const mine = !myZoneIds || myZoneIds.has(zone.id);
+
+            return (
+              <g key={zone.id}>
+                <rect
+                  x={box.minX - 24}
+                  y={box.minY - 56}
+                  width={box.maxX - box.minX + 48}
+                  height={box.maxY - box.minY + 80}
+                  rx={16}
+                  fill="#ffffff"
+                  fillOpacity={mine ? 0.04 : 0.015}
+                  stroke={mine && myZoneIds ? '#60a5fa' : '#ffffff'}
+                  strokeOpacity={mine && myZoneIds ? 0.5 : 0.12}
+                  strokeWidth={mine && myZoneIds ? 3 : 2}
+                />
+                <text
+                  x={box.minX - 8}
+                  y={box.minY - 22}
+                  fontSize={34}
+                  fill={mine ? '#cbd5e1' : '#64748b'}
+                  fontWeight={700}
+                >
+                  {zone.name}
+                  {/* Quién puede usarla, sin depender solo del atenuado */}
+                  {` · ${zoneAudience(zone.allowedCategories)}`}
+                  {!zone.isActive && ' (inactiva)'}
+                </text>
+              </g>
+            );
+          })}
 
           {spaceLayer}
 

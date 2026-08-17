@@ -79,7 +79,7 @@ describe('Concurrencia (e2e)', () => {
     });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.parkingSpace.updateMany({
-      where: { code: { startsWith: 'F-0' } },
+      where: { code: { startsWith: 'C-0' } },
       data: { status: SpaceStatus.AVAILABLE },
     });
     await app.close();
@@ -93,7 +93,7 @@ describe('Concurrencia (e2e)', () => {
 
   describe('la garantía está en la base de datos, no solo en el servicio', () => {
     it('RN-001: el índice único parcial impide dos sesiones activas en un puesto', async () => {
-      const [space] = await resetSpaces(['F-001']);
+      const [space] = await resetSpaces(['C-001']);
 
       await prisma.parkingSession.create({
         data: { userId: userIds[0], parkingSpaceId: space.id },
@@ -108,7 +108,7 @@ describe('Concurrencia (e2e)', () => {
     });
 
     it('RN-002: y tampoco dos sesiones activas del mismo usuario', async () => {
-      const [a, b] = await resetSpaces(['F-002', 'F-003']);
+      const [a, b] = await resetSpaces(['C-002', 'C-003']);
 
       await prisma.parkingSession.create({
         data: { userId: userIds[0], parkingSpaceId: a.id },
@@ -122,7 +122,7 @@ describe('Concurrencia (e2e)', () => {
     });
 
     it('una sesión cerrada no consume el cupo: se puede volver a ocupar', async () => {
-      const [space] = await resetSpaces(['F-004']);
+      const [space] = await resetSpaces(['C-004']);
 
       await prisma.parkingSession.create({
         data: {
@@ -143,7 +143,7 @@ describe('Concurrencia (e2e)', () => {
 
   describe('rollback', () => {
     it('si la sesión no puede crearse, el puesto no queda ocupado', async () => {
-      const [space] = await resetSpaces(['F-005']);
+      const [space] = await resetSpaces(['C-005']);
 
       // Estado inconsistente a propósito: hay una sesión activa sobre el
       // puesto, pero el puesto figura AVAILABLE. El UPDATE atómico tendrá
@@ -177,7 +177,7 @@ describe('Concurrencia (e2e)', () => {
     it('12 usuarios sobre 12 puestos distintos: todos ganan', async () => {
       const codes = Array.from(
         { length: 12 },
-        (_, i) => `F-0${String(i + 10).padStart(2, '0')}`,
+        (_, i) => `C-0${String(i + 10).padStart(2, '0')}`,
       );
       const spaces = await resetSpaces(codes);
       expect(spaces).toHaveLength(12);
@@ -208,7 +208,7 @@ describe('Concurrencia (e2e)', () => {
     it('liberaciones simultáneas dejan todos los puestos disponibles', async () => {
       const codes = Array.from(
         { length: 12 },
-        (_, i) => `F-0${String(i + 10).padStart(2, '0')}`,
+        (_, i) => `C-0${String(i + 10).padStart(2, '0')}`,
       );
       const spaces = await resetSpaces(codes);
 

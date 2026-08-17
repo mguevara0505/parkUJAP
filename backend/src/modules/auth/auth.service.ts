@@ -88,6 +88,8 @@ export class AuthService {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
+        // El mapa resalta las zonas del usuario nada más iniciar sesión
+        category: user.category,
       },
     };
   }
@@ -166,6 +168,7 @@ export class AuthService {
         lastName: true,
         email: true,
         role: true,
+        category: true,
         universityId: true,
         documentId: true,
         phone: true,

@@ -63,7 +63,7 @@ docker compose up -d postgres
 cd backend
 npm install
 npx prisma migrate deploy   # aplica las migraciones existentes
-npm run seed                # 1 admin, 20 usuarios, 1 estacionamiento, 10 zonas, 1.000 puestos
+npm run seed                # admin, 20 usuarios por categoría, 10 zonas y 1.000 puestos
 npm run start:dev
 
 # 3. Frontend (otra terminal)
@@ -93,12 +93,34 @@ npm run dev
 
 ---
 
-## 👤 Roles
+## 👤 Roles y categorías
+
+Son dos ejes independientes: el **rol** decide qué puede hacer en el sistema, la
+**categoría** decide dónde puede estacionarse.
 
 | Rol | Descripción |
 |-----|-------------|
 | `USER` | Estudiante/profesor/empleado — registra su estacionamiento |
 | `ADMIN` | Administrador — gestiona puestos, reservas y visitantes |
+
+| Categoría | Zonas propias |
+|-----------|---------------|
+| `STUDENT` | A, B, C, D |
+| `PROFESSOR` | E, F, G |
+| `STAFF` | H |
+
+Las zonas **I y J** no admiten registro por iniciativa propia: se acceden solo
+mediante una reserva administrativa (autoridades, proveedores, visitantes y
+eventos). Un usuario con una reserva a su nombre sí puede ocupar el puesto
+reservado, sea cual sea la zona.
+
+El reparto se cambia desde **Zonas** en el panel de administración: cada zona
+tiene interruptores por categoría, y dejarlas todas apagadas la convierte en
+zona de reserva exclusiva. La regla la aplica el backend, no solo la interfaz.
+
+> Este reparto por categoría es una decisión posterior al Documento Maestro,
+> que en su sección 7.1 trata a todos los usuarios por igual. Conviene
+> reflejarlo allí.
 
 ---
 

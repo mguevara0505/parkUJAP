@@ -1,4 +1,10 @@
-import { PrismaClient, Role, SpaceType, UserStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  Role,
+  SpaceType,
+  UserCategory,
+  UserStatus,
+} from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
@@ -30,6 +36,8 @@ async function main() {
       email: 'admin@ujap.edu.ve',
       passwordHash: adminPasswordHash,
       role: Role.ADMIN,
+      // Quien administra el sistema es, físicamente, personal administrativo
+      category: UserCategory.STAFF,
       status: UserStatus.ACTIVE,
       universityId: 'ADMIN-001',
       documentId: 'V-00000001',
@@ -44,27 +52,132 @@ async function main() {
   // ────────────────────────────────────────────
   const userPasswordHash = await bcrypt.hash('User1234!', BCRYPT_ROUNDS);
 
+  // Mezcla realista de categorías para poder probar el reparto de zonas
+  const S = UserCategory.STUDENT;
+  const P = UserCategory.PROFESSOR;
+  const A = UserCategory.STAFF;
+
   const userNames = [
-    { firstName: 'Carlos', lastName: 'Rodríguez', universityId: '2023-001' },
-    { firstName: 'María', lastName: 'González', universityId: '2023-002' },
-    { firstName: 'Luis', lastName: 'Martínez', universityId: '2023-003' },
-    { firstName: 'Ana', lastName: 'López', universityId: '2023-004' },
-    { firstName: 'Pedro', lastName: 'García', universityId: '2023-005' },
-    { firstName: 'Laura', lastName: 'Hernández', universityId: '2023-006' },
-    { firstName: 'José', lastName: 'Díaz', universityId: '2023-007' },
-    { firstName: 'Sofía', lastName: 'Fernández', universityId: '2023-008' },
-    { firstName: 'Miguel', lastName: 'Torres', universityId: '2023-009' },
-    { firstName: 'Valentina', lastName: 'Vargas', universityId: '2023-010' },
-    { firstName: 'Andrés', lastName: 'Jiménez', universityId: '2024-001' },
-    { firstName: 'Isabella', lastName: 'Morales', universityId: '2024-002' },
-    { firstName: 'Diego', lastName: 'Castillo', universityId: '2024-003' },
-    { firstName: 'Camila', lastName: 'Romero', universityId: '2024-004' },
-    { firstName: 'Sebastián', lastName: 'Flores', universityId: '2024-005' },
-    { firstName: 'Gabriela', lastName: 'Reyes', universityId: '2024-006' },
-    { firstName: 'Alejandro', lastName: 'Cruz', universityId: '2024-007' },
-    { firstName: 'Daniela', lastName: 'Mora', universityId: '2024-008' },
-    { firstName: 'Ricardo', lastName: 'Sánchez', universityId: '2024-009' },
-    { firstName: 'Mariana', lastName: 'Gutiérrez', universityId: '2024-010' },
+    {
+      firstName: 'Carlos',
+      lastName: 'Rodríguez',
+      universityId: '2023-001',
+      category: S,
+    },
+    {
+      firstName: 'María',
+      lastName: 'González',
+      universityId: '2023-002',
+      category: S,
+    },
+    {
+      firstName: 'Luis',
+      lastName: 'Martínez',
+      universityId: '2023-003',
+      category: S,
+    },
+    {
+      firstName: 'Ana',
+      lastName: 'López',
+      universityId: '2023-004',
+      category: S,
+    },
+    {
+      firstName: 'Pedro',
+      lastName: 'García',
+      universityId: '2023-005',
+      category: S,
+    },
+    {
+      firstName: 'Laura',
+      lastName: 'Hernández',
+      universityId: '2023-006',
+      category: S,
+    },
+    {
+      firstName: 'José',
+      lastName: 'Díaz',
+      universityId: '2023-007',
+      category: S,
+    },
+    {
+      firstName: 'Sofía',
+      lastName: 'Fernández',
+      universityId: '2023-008',
+      category: S,
+    },
+    {
+      firstName: 'Miguel',
+      lastName: 'Torres',
+      universityId: '2023-009',
+      category: S,
+    },
+    {
+      firstName: 'Valentina',
+      lastName: 'Vargas',
+      universityId: '2023-010',
+      category: S,
+    },
+    {
+      firstName: 'Andrés',
+      lastName: 'Jiménez',
+      universityId: '2024-001',
+      category: S,
+    },
+    {
+      firstName: 'Isabella',
+      lastName: 'Morales',
+      universityId: '2024-002',
+      category: S,
+    },
+    {
+      firstName: 'Diego',
+      lastName: 'Castillo',
+      universityId: '2024-003',
+      category: S,
+    },
+    {
+      firstName: 'Camila',
+      lastName: 'Romero',
+      universityId: '2024-004',
+      category: S,
+    },
+    {
+      firstName: 'Sebastián',
+      lastName: 'Flores',
+      universityId: 'PROF-001',
+      category: P,
+    },
+    {
+      firstName: 'Gabriela',
+      lastName: 'Reyes',
+      universityId: 'PROF-002',
+      category: P,
+    },
+    {
+      firstName: 'Alejandro',
+      lastName: 'Cruz',
+      universityId: 'PROF-003',
+      category: P,
+    },
+    {
+      firstName: 'Daniela',
+      lastName: 'Mora',
+      universityId: 'PROF-004',
+      category: P,
+    },
+    {
+      firstName: 'Ricardo',
+      lastName: 'Sánchez',
+      universityId: 'ADM-001',
+      category: A,
+    },
+    {
+      firstName: 'Mariana',
+      lastName: 'Gutiérrez',
+      universityId: 'ADM-002',
+      category: A,
+    },
   ];
 
   for (const u of userNames) {
@@ -81,19 +194,24 @@ async function main() {
 
     await prisma.user.upsert({
       where: { email },
-      update: {},
+      // La categoría sí se reaplica: define en qué zonas puede estacionarse y
+      // debe poder corregirse reejecutando el seed. La contraseña no se toca.
+      update: { category: u.category, universityId: u.universityId },
       create: {
         firstName: u.firstName,
         lastName: u.lastName,
         email,
         passwordHash: userPasswordHash,
         role: Role.USER,
+        category: u.category,
         status: UserStatus.ACTIVE,
         universityId: u.universityId,
       },
     });
 
-    process.stdout.write(`  👤 ${u.firstName} ${u.lastName} → ${email}\n`);
+    process.stdout.write(
+      `  👤 ${u.firstName} ${u.lastName} [${u.category}] → ${email}\n`,
+    );
   }
 
   console.log('\n✅ 20 usuarios creados\n');
@@ -118,7 +236,16 @@ async function main() {
   // ────────────────────────────────────────────
   // 4. ZONAS (sección 8.3) — 10 zonas, códigos A..J
   // ────────────────────────────────────────────
-  // `type` y `priority` describen el carácter de cada zona (secciones 8.4 y 17)
+  // Reparto del campus por categoría.
+  //
+  // El nombre NO incluye a quién pertenece la zona: eso lo dice
+  // `allowedCategories`, y duplicarlo en el nombre haría que este mintiera en
+  // cuanto un administrador cambiara el reparto. La interfaz compone la
+  // etiqueta "Zona A · Estudiantes" a partir de una única fuente de verdad.
+  //
+  // `allowedCategories` vacío = solo por reserva (autoridades, proveedores,
+  // eventos). Los visitantes externos no son usuarios del sistema: acceden
+  // siempre mediante una reserva administrativa.
   const zones = [
     {
       code: 'A',
@@ -127,6 +254,7 @@ async function main() {
       type: SpaceType.STANDARD,
       priority: 2,
       isCovered: false,
+      allowedCategories: [S],
     },
     {
       code: 'B',
@@ -135,6 +263,7 @@ async function main() {
       type: SpaceType.STANDARD,
       priority: 3,
       isCovered: false,
+      allowedCategories: [S],
     },
     {
       code: 'C',
@@ -143,62 +272,70 @@ async function main() {
       type: SpaceType.STANDARD,
       priority: 3,
       isCovered: false,
+      allowedCategories: [S],
     },
     {
       code: 'D',
       name: 'Zona D',
-      description: 'Lateral oeste',
-      type: SpaceType.STANDARD,
-      priority: 4,
-      isCovered: false,
-    },
-    {
-      code: 'E',
-      name: 'Zona E',
       description: 'Área deportiva',
       type: SpaceType.STANDARD,
       priority: 4,
       isCovered: false,
+      allowedCategories: [S],
+    },
+    {
+      code: 'E',
+      name: 'Zona E',
+      description: 'Lateral oeste',
+      type: SpaceType.PROFESSOR,
+      priority: 3,
+      isCovered: false,
+      allowedCategories: [P],
     },
     {
       code: 'F',
       name: 'Zona F',
       description: 'Zona techada',
-      type: SpaceType.STANDARD,
+      type: SpaceType.PROFESSOR,
       priority: 2,
       isCovered: true,
+      allowedCategories: [P],
     },
     {
       code: 'G',
       name: 'Zona G',
-      description: 'Zona de profesores',
+      description: 'Frente a las facultades',
       type: SpaceType.PROFESSOR,
       priority: 2,
       isCovered: false,
+      allowedCategories: [P],
     },
     {
       code: 'H',
       name: 'Zona H',
-      description: 'Zona administrativa',
+      description: 'Junto al edificio administrativo',
       type: SpaceType.STAFF,
       priority: 3,
       isCovered: false,
+      allowedCategories: [A],
     },
     {
       code: 'I',
       name: 'Zona I',
-      description: 'Zona de visitantes',
+      description: 'Solo por reserva: visitantes y proveedores',
       type: SpaceType.VISITOR,
       priority: 2,
       isCovered: false,
+      allowedCategories: [],
     },
     {
       code: 'J',
       name: 'Zona J',
-      description: 'Zona VIP y autoridades',
+      description: 'Solo por reserva: autoridades y eventos',
       type: SpaceType.VIP,
       priority: 1,
       isCovered: true,
+      allowedCategories: [],
     },
   ];
 
@@ -207,11 +344,18 @@ async function main() {
   for (const [index, zone] of zones.entries()) {
     const created = await prisma.parkingZone.upsert({
       where: { code: zone.code },
-      update: {},
+      // El reparto por categoría sí se reaplica: es la regla vigente del
+      // campus y debe poder corregirse reejecutando el seed
+      update: {
+        name: zone.name,
+        description: zone.description,
+        allowedCategories: zone.allowedCategories,
+      },
       create: {
         code: zone.code,
         name: zone.name,
         description: zone.description,
+        allowedCategories: zone.allowedCategories,
         parkingLotId: lot.id,
         floor: 1,
         sortOrder: index + 1,
@@ -219,7 +363,11 @@ async function main() {
     });
 
     zoneIds.set(zone.code, created.id);
-    process.stdout.write(`  🅿️  ${zone.code} → ${zone.name}\n`);
+    const quien =
+      zone.allowedCategories.length === 0
+        ? 'solo por reserva'
+        : zone.allowedCategories.join(', ');
+    process.stdout.write(`  🅿️  ${zone.code} → ${zone.name} (${quien})\n`);
   }
 
   console.log('\n✅ 10 zonas creadas\n');

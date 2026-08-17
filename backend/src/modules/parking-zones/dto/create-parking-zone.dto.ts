@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -12,6 +14,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { UserCategory } from '@prisma/client';
 
 export class CreateParkingZoneDto {
   @ApiProperty({
@@ -69,4 +72,16 @@ export class CreateParkingZoneDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    enum: UserCategory,
+    isArray: true,
+    description:
+      'Categorías que pueden estacionarse aquí por su cuenta. Una lista vacía significa "solo por reserva administrativa" (autoridades, proveedores, eventos).',
+    example: [UserCategory.STUDENT],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(UserCategory, { each: true })
+  allowedCategories?: UserCategory[];
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '../lib/api';
+import type { UserCategory } from '../lib/parking';
 
 export interface AuthUser {
   id: string;
@@ -8,6 +9,8 @@ export interface AuthUser {
   lastName: string;
   email: string;
   role: 'USER' | 'ADMIN';
+  /** Decide en qué zonas puede estacionarse (independiente del rol). */
+  category: UserCategory;
 }
 
 /**

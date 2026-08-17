@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import { api } from '@/lib/api';
-import type { MapSpace, SpaceStatus, SpaceType } from '@/lib/parking';
+import type {
+  MapSpace,
+  SpaceStatus,
+  SpaceType,
+  UserCategory,
+} from '@/lib/parking';
 
 export interface MapZone {
   id: string;
@@ -11,6 +16,8 @@ export interface MapZone {
   name: string;
   sortOrder: number;
   isActive: boolean;
+  /** Vacío = solo por reserva administrativa. */
+  allowedCategories: UserCategory[];
 }
 
 interface MapPayload {

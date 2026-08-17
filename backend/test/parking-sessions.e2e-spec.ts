@@ -18,6 +18,8 @@ import {
  * Cubre E2E-003, E2E-004, E2E-005 y E2E-009 del Documento Maestro.
  * Requiere el seed aplicado.
  */
+// Zona B: estudiantes. Los usuarios de prueba son STUDENT por defecto y el
+// reparto por categoría solo les permite las zonas A-D.
 const RIVALS = Array.from({ length: 10 }, (_, i) => ({
   email: `e2e-rival${i}@ujap.edu.ve`,
   password: 'E2eRival123',
@@ -104,7 +106,7 @@ describe('Parking Sessions (e2e)', () => {
 
     // Devolver los puestos usados a su estado inicial
     await prisma.parkingSpace.updateMany({
-      where: { code: { in: ['E-001', 'E-002', 'E-003', 'E-004', 'E-005'] } },
+      where: { code: { in: ['B-010', 'B-011', 'B-012', 'B-013', 'B-014'] } },
       data: { status: SpaceStatus.AVAILABLE },
     });
     await app.close();
@@ -120,7 +122,7 @@ describe('Parking Sessions (e2e)', () => {
 
   describe('E2E-003 — registrar ocupación', () => {
     it('el check-in crea la sesión y deja el puesto OCCUPIED', async () => {
-      const space = await resetSpace('E-001');
+      const space = await resetSpace('B-010');
 
       const res = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -130,7 +132,7 @@ describe('Parking Sessions (e2e)', () => {
 
       const { data } = res.body as SessionBody;
       expect(data.status).toBe(SessionStatus.ACTIVE);
-      expect(data.parkingSpace.code).toBe('E-001');
+      expect(data.parkingSpace.code).toBe('B-010');
       expect(data.checkOutAt).toBeNull();
 
       const after = await prisma.parkingSpace.findUniqueOrThrow({
@@ -140,7 +142,7 @@ describe('Parking Sessions (e2e)', () => {
     });
 
     it('/me/active devuelve la sesión en curso', async () => {
-      const space = await resetSpace('E-001');
+      const space = await resetSpace('B-010');
       await http()
         .post('/api/v1/parking-sessions/check-in')
         .set(auth(userToken))
@@ -152,12 +154,12 @@ describe('Parking Sessions (e2e)', () => {
         .set(auth(userToken))
         .expect(200);
 
-      expect((res.body as SessionBody).data.parkingSpace.code).toBe('E-001');
+      expect((res.body as SessionBody).data.parkingSpace.code).toBe('B-010');
     });
 
     it('RN-002: el mismo usuario no puede ocupar un segundo puesto', async () => {
-      const first = await resetSpace('E-001');
-      const second = await resetSpace('E-002');
+      const first = await resetSpace('B-010');
+      const second = await resetSpace('B-011');
 
       await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -186,7 +188,7 @@ describe('Parking Sessions (e2e)', () => {
     it.each([SpaceStatus.DISABLED, SpaceStatus.MAINTENANCE])(
       'E2E-009 — un puesto %s no puede ocuparse',
       async (status) => {
-        const space = await resetSpace('E-003');
+        const space = await resetSpace('B-012');
         await prisma.parkingSpace.update({
           where: { id: space.id },
           data: { status },
@@ -212,7 +214,7 @@ describe('Parking Sessions (e2e)', () => {
 
   describe('E2E-004 — concurrencia (sección 25)', () => {
     it('2 usuarios sobre el mismo puesto: uno gana, el otro recibe 409', async () => {
-      const space = await resetSpace('E-004');
+      const space = await resetSpace('B-013');
 
       const [a, b] = await Promise.all(
         rivalTokens
@@ -235,7 +237,7 @@ describe('Parking Sessions (e2e)', () => {
     });
 
     it('10 usuarios sobre el mismo puesto: exactamente una sesión activa', async () => {
-      const space = await resetSpace('E-005');
+      const space = await resetSpace('B-014');
 
       const responses = await Promise.all(
         rivalTokens.map((token) =>
@@ -264,8 +266,8 @@ describe('Parking Sessions (e2e)', () => {
     });
 
     it('un mismo usuario pulsando dos veces solo crea una sesión (RN-002)', async () => {
-      const first = await resetSpace('E-001');
-      const second = await resetSpace('E-002');
+      const first = await resetSpace('B-010');
+      const second = await resetSpace('B-011');
 
       const responses = await Promise.all([
         http()
@@ -292,7 +294,7 @@ describe('Parking Sessions (e2e)', () => {
 
   describe('E2E-005 — liberar el puesto', () => {
     it('el check-out cierra la sesión y devuelve el puesto a AVAILABLE (RN-015)', async () => {
-      const space = await resetSpace('E-001');
+      const space = await resetSpace('B-010');
 
       const checkIn = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -318,7 +320,7 @@ describe('Parking Sessions (e2e)', () => {
     });
 
     it('un usuario no puede liberar la sesión de otro (403)', async () => {
-      const space = await resetSpace('E-001');
+      const space = await resetSpace('B-010');
 
       const checkIn = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -335,7 +337,7 @@ describe('Parking Sessions (e2e)', () => {
     });
 
     it('un ADMIN sí puede liberar administrativamente (pantalla A03)', async () => {
-      const space = await resetSpace('E-001');
+      const space = await resetSpace('B-010');
 
       const checkIn = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -357,7 +359,7 @@ describe('Parking Sessions (e2e)', () => {
     });
 
     it('no se puede liberar dos veces la misma sesión', async () => {
-      const space = await resetSpace('E-001');
+      const space = await resetSpace('B-010');
 
       const checkIn = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -373,7 +375,7 @@ describe('Parking Sessions (e2e)', () => {
     });
 
     it('tras liberar, el puesto vuelve a aparecer en /available', async () => {
-      const space = await resetSpace('E-001');
+      const space = await resetSpace('B-010');
 
       const checkIn = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -388,7 +390,7 @@ describe('Parking Sessions (e2e)', () => {
       expect(
         (
           ocupado.body as { data: { spaces: { code: string }[] } }
-        ).data.spaces.some((s) => s.code === 'E-001'),
+        ).data.spaces.some((s) => s.code === 'B-010'),
       ).toBe(false);
 
       await http()
@@ -405,14 +407,14 @@ describe('Parking Sessions (e2e)', () => {
       expect(
         (
           libre.body as { data: { spaces: { code: string }[] } }
-        ).data.spaces.some((s) => s.code === 'E-001'),
+        ).data.spaces.some((s) => s.code === 'B-010'),
       ).toBe(true);
     });
   });
 
   describe('historial', () => {
     it('el historial propio registra entrada y salida', async () => {
-      const space = await resetSpace('E-001');
+      const space = await resetSpace('B-010');
 
       const checkIn = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -437,7 +439,7 @@ describe('Parking Sessions (e2e)', () => {
         meta: { total: number };
       };
       expect(body.meta.total).toBeGreaterThanOrEqual(1);
-      expect(body.data[0].parkingSpace.code).toBe('E-001');
+      expect(body.data[0].parkingSpace.code).toBe('B-010');
       expect(body.data[0].checkOutAt).not.toBeNull();
     });
 

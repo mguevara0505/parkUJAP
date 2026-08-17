@@ -68,6 +68,33 @@ export const TYPE_LABELS: Record<SpaceType, string> = {
   OTHER: 'Otro',
 };
 
+/**
+ * Categoría del miembro de la universidad. Decide en qué zonas puede
+ * estacionarse; el rol (USER/ADMIN) decide qué puede hacer en el sistema.
+ */
+export type UserCategory = 'STUDENT' | 'PROFESSOR' | 'STAFF';
+
+export const CATEGORY_LABELS: Record<UserCategory, string> = {
+  STUDENT: 'Estudiantes',
+  PROFESSOR: 'Profesores',
+  STAFF: 'Administrativos',
+};
+
+export const CATEGORY_SINGULAR: Record<UserCategory, string> = {
+  STUDENT: 'Estudiante',
+  PROFESSOR: 'Profesor',
+  STAFF: 'Administrativo',
+};
+
+/**
+ * Describe quién puede usar una zona. Una lista vacía significa que solo se
+ * accede mediante una reserva administrativa.
+ */
+export function zoneAudience(allowedCategories: UserCategory[]): string {
+  if (allowedCategories.length === 0) return 'Solo por reserva';
+  return allowedCategories.map((c) => CATEGORY_LABELS[c]).join(' y ');
+}
+
 /** Escala de prioridad de la sección 17. */
 export const PRIORITY_LABELS: Record<number, string> = {
   1: 'Máxima',

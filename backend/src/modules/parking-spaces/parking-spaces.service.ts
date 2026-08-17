@@ -164,6 +164,8 @@ export class ParkingSpacesService {
           name: true,
           sortOrder: true,
           isActive: true,
+          // El mapa resalta las zonas que corresponden a quien mira
+          allowedCategories: true,
         },
         orderBy: { sortOrder: 'asc' },
       }),

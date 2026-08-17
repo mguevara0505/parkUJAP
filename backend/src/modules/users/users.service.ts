@@ -10,7 +10,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserQueryDto } from './dto/user-query.dto';
 import { paginate } from '../../common/dto/pagination.dto';
-import { Role, UserStatus } from '@prisma/client';
+import { Role, UserCategory, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const BCRYPT_ROUNDS = 12;
@@ -22,6 +22,7 @@ const USER_SELECT = {
   lastName: true,
   email: true,
   role: true,
+  category: true,
   universityId: true,
   documentId: true,
   phone: true,
@@ -62,6 +63,7 @@ export class UsersService {
         email: dto.email,
         passwordHash,
         role: dto.role ?? Role.USER,
+        category: dto.category ?? UserCategory.STUDENT,
         universityId: dto.universityId,
         documentId: dto.documentId,
         phone: dto.phone,
@@ -149,6 +151,7 @@ export class UsersService {
         lastName: dto.lastName,
         email: dto.email,
         role: dto.role,
+        category: dto.category,
         universityId: dto.universityId,
         documentId: dto.documentId,
         phone: dto.phone,

@@ -9,6 +9,7 @@ import {
   SelectField,
   StatusBadge,
 } from '@/components/admin-ui';
+import { CATEGORY_LABELS, type UserCategory } from '@/lib/parking';
 
 interface ParkingLotOption {
   id: string;
@@ -23,9 +24,12 @@ interface ParkingZone {
   floor: number | null;
   sortOrder: number;
   isActive: boolean;
+  allowedCategories: UserCategory[];
   parkingLot?: { id: string; name: string; code: string };
   _count?: { spaces: number };
 }
+
+const CATEGORIES: UserCategory[] = ['STUDENT', 'PROFESSOR', 'STAFF'];
 
 const EMPTY = { parkingLotId: '', name: '', code: '', floor: '1' };
 
@@ -165,6 +169,9 @@ export default function AdminZonesPage() {
                   <th scope="col" className="text-left px-6 py-3">
                     Estacionamiento
                   </th>
+                  <th scope="col" className="text-left px-6 py-3">
+                    Quién puede usarla
+                  </th>
                   <th scope="col" className="text-right px-6 py-3">
                     Piso
                   </th>
@@ -188,6 +195,42 @@ export default function AdminZonesPage() {
                     <td className="px-6 py-4 text-white">{zone.name}</td>
                     <td className="px-6 py-4 text-slate-400">
                       {zone.parkingLot?.name ?? '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      {/* Casillas en lugar de texto: el reparto se cambia aquí */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {CATEGORIES.map((cat) => {
+                          const on = zone.allowedCategories.includes(cat);
+                          return (
+                            <button
+                              key={cat}
+                              onClick={() =>
+                                void patch(zone.id, {
+                                  allowedCategories: on
+                                    ? zone.allowedCategories.filter(
+                                        (c) => c !== cat,
+                                      )
+                                    : [...zone.allowedCategories, cat],
+                                })
+                              }
+                              aria-pressed={on}
+                              className={`px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                                on
+                                  ? 'bg-blue-600/20 text-blue-300 border-blue-500/30'
+                                  : 'bg-white/5 text-slate-500 border-white/10 hover:text-slate-300'
+                              }`}
+                            >
+                              {on ? '✓ ' : ''}
+                              {CATEGORY_LABELS[cat]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {zone.allowedCategories.length === 0 && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Solo por reserva administrativa
+                        </p>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right text-slate-300">
                       {zone.floor ?? '—'}

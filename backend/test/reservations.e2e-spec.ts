@@ -18,7 +18,7 @@ import {
  * Cubre E2E-006 y E2E-007, RN-005, RN-006, RN-007, RN-008 y la política de
  * la sección 44.
  */
-const CODES = ['G-001', 'G-002', 'G-003', 'G-004'];
+const CODES = ['D-001', 'D-002', 'D-003', 'D-004'];
 
 /** Fechas relativas para no depender del reloj: base = mañana a las 08:00. */
 const base = new Date();
@@ -95,7 +95,7 @@ describe('Reservations (e2e)', () => {
   describe('E2E-006 — crear reserva', () => {
     it('el ADMIN crea una reserva y queda CONFIRMED', async () => {
       const res = await reserve({
-        parkingSpaceId: await spaceIdOf('G-001'),
+        parkingSpaceId: await spaceIdOf('D-001'),
         title: 'Acto de graduación — Prof. Juan Pérez',
         startAt: at(0),
         endAt: at(6),
@@ -105,11 +105,11 @@ describe('Reservations (e2e)', () => {
 
       const { data } = res.body as ReservationBody;
       expect(data.status).toBe(ReservationStatus.CONFIRMED);
-      expect(data.parkingSpace.code).toBe('G-001');
+      expect(data.parkingSpace.code).toBe('D-001');
     });
 
     it('un USER no puede crear reservas (sección 7.1)', async () => {
-      const parkingSpaceId = await spaceIdOf('G-001');
+      const parkingSpaceId = await spaceIdOf('D-001');
 
       await http()
         .post('/api/v1/reservations')
@@ -130,7 +130,7 @@ describe('Reservations (e2e)', () => {
 
     it('rechaza un rango invertido', async () => {
       await reserve({
-        parkingSpaceId: await spaceIdOf('G-001'),
+        parkingSpaceId: await spaceIdOf('D-001'),
         title: 'Rango inválido',
         startAt: at(6),
         endAt: at(2),
@@ -149,7 +149,7 @@ describe('Reservations (e2e)', () => {
 
   describe('RN-006 y política de la sección 44', () => {
     it('rechaza reservas solapadas: 08:00-10:00 y 09:00-11:00', async () => {
-      const parkingSpaceId = await spaceIdOf('G-002');
+      const parkingSpaceId = await spaceIdOf('D-002');
 
       await reserve({
         parkingSpaceId,
@@ -176,7 +176,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('permite reservas consecutivas: 08:00-10:00 y 10:00-12:00', async () => {
-      const parkingSpaceId = await spaceIdOf('G-002');
+      const parkingSpaceId = await spaceIdOf('D-002');
 
       await reserve({
         parkingSpaceId,
@@ -198,7 +198,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('una reserva cancelada libera el intervalo (RN-007)', async () => {
-      const parkingSpaceId = await spaceIdOf('G-002');
+      const parkingSpaceId = await spaceIdOf('D-002');
 
       const first = await reserve({
         parkingSpaceId,
@@ -231,7 +231,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('la restricción vive en la base de datos, no en el servicio', async () => {
-      const parkingSpaceId = await spaceIdOf('G-002');
+      const parkingSpaceId = await spaceIdOf('D-002');
       const admin = await prisma.user.findUniqueOrThrow({
         where: { email: E2E_ADMIN.email },
       });
@@ -284,7 +284,7 @@ describe('Reservations (e2e)', () => {
     };
 
     it('la reserva vigente deja el puesto en RESERVED', async () => {
-      const { parkingSpaceId } = await reserveNow('G-003');
+      const { parkingSpaceId } = await reserveNow('D-003');
 
       const space = await prisma.parkingSpace.findUniqueOrThrow({
         where: { id: parkingSpaceId },
@@ -293,7 +293,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('E2E-007: otro usuario no puede ocupar el puesto reservado', async () => {
-      const { parkingSpaceId } = await reserveNow('G-003');
+      const { parkingSpaceId } = await reserveNow('D-003');
 
       const res = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -307,7 +307,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('RN-005: el titular de la reserva sí puede ocuparlo', async () => {
-      const { parkingSpaceId, id } = await reserveNow('G-003', userId);
+      const { parkingSpaceId, id } = await reserveNow('D-003', userId);
 
       const res = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -330,7 +330,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('RN-015: al liberar, el puesto vuelve a RESERVED, no a AVAILABLE', async () => {
-      const { parkingSpaceId } = await reserveNow('G-003', userId);
+      const { parkingSpaceId } = await reserveNow('D-003', userId);
 
       const checkIn = await http()
         .post('/api/v1/parking-sessions/check-in')
@@ -353,7 +353,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('al cancelar la reserva vigente, el puesto vuelve a estar disponible', async () => {
-      const { parkingSpaceId, id } = await reserveNow('G-003');
+      const { parkingSpaceId, id } = await reserveNow('D-003');
 
       await http()
         .post(`/api/v1/reservations/${id}/cancel`)
@@ -369,7 +369,7 @@ describe('Reservations (e2e)', () => {
 
   describe('job programado (sección 45)', () => {
     it('activa la reserva cuyo período empezó y protege el puesto', async () => {
-      const parkingSpaceId = await spaceIdOf('G-004');
+      const parkingSpaceId = await spaceIdOf('D-004');
       const admin = await prisma.user.findUniqueOrThrow({
         where: { email: E2E_ADMIN.email },
       });
@@ -399,7 +399,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('RN-008: una reserva vencida sin uso pasa a NO_SHOW y libera el puesto', async () => {
-      const parkingSpaceId = await spaceIdOf('G-004');
+      const parkingSpaceId = await spaceIdOf('D-004');
       const admin = await prisma.user.findUniqueOrThrow({
         where: { email: E2E_ADMIN.email },
       });
@@ -433,7 +433,7 @@ describe('Reservations (e2e)', () => {
     });
 
     it('RN-008: si alguien la usó, la reserva vencida pasa a COMPLETED', async () => {
-      const parkingSpaceId = await spaceIdOf('G-004');
+      const parkingSpaceId = await spaceIdOf('D-004');
       const admin = await prisma.user.findUniqueOrThrow({
         where: { email: E2E_ADMIN.email },
       });
@@ -472,7 +472,7 @@ describe('Reservations (e2e)', () => {
 
   describe('listado y filtros (pantalla A04)', () => {
     it('filtra por puesto y por estado', async () => {
-      const parkingSpaceId = await spaceIdOf('G-001');
+      const parkingSpaceId = await spaceIdOf('D-001');
 
       await reserve({
         parkingSpaceId,
@@ -494,7 +494,7 @@ describe('Reservations (e2e)', () => {
 
     it('busca por placa del vehículo', async () => {
       await reserve({
-        parkingSpaceId: await spaceIdOf('G-001'),
+        parkingSpaceId: await spaceIdOf('D-001'),
         title: 'Con placa',
         startAt: at(0),
         endAt: at(2),

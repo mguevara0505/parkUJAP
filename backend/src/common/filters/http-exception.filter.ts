@@ -130,15 +130,30 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let error = 'Internal Server Error';
     let code = 'INTERNAL_SERVER_ERROR';
 
+    // Datos estructurados que el servicio adjunta al error para que la
+    // interfaz pueda actuar: qué zonas le corresponden al usuario, con qué
+    // reserva chocó... Sin este paso se perdían por el camino.
+    let details: Record<string, unknown> = {};
+
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        const resp = exceptionResponse as Record<string, unknown>;
-        message = (resp['message'] as string) || exception.message;
-        error = (resp['error'] as string) || exception.name;
-        code = (resp['code'] as string) || this.getErrorCode(statusCode);
+        const {
+          message: m,
+          error: e,
+          code: c,
+          ...extra
+        } = exceptionResponse as Record<string, unknown>;
+
+        message = (m as string) || exception.message;
+        error = (e as string) || exception.name;
+        code = (c as string) || this.getErrorCode(statusCode);
+
+        // `statusCode` lo aporta Nest en sus excepciones estándar; no duplicar
+        delete extra['statusCode'];
+        details = extra;
       } else {
         message = exceptionResponse;
         error = exception.name;
@@ -161,6 +176,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error,
       code,
       message: Array.isArray(message) ? message.join(', ') : message,
+      ...details,
       timestamp: new Date().toISOString(),
       path: request.url,
     };

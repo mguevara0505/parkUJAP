@@ -8,7 +8,7 @@ import {
   MaxLength,
   Matches,
 } from 'class-validator';
-import { Role } from '@prisma/client';
+import { Role, UserCategory } from '@prisma/client';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'Juan', description: 'Nombre' })
@@ -45,6 +45,16 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(Role)
   role?: Role;
+
+  @ApiPropertyOptional({
+    enum: UserCategory,
+    default: UserCategory.STUDENT,
+    description:
+      'Determina en qué zonas puede estacionarse. Independiente del rol: un ADMIN del sistema suele ser, físicamente, personal administrativo.',
+  })
+  @IsOptional()
+  @IsEnum(UserCategory)
+  category?: UserCategory;
 
   @ApiPropertyOptional({ example: '2024-001', description: 'ID universitario' })
   @IsOptional()
