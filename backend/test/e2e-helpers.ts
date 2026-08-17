@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as bcrypt from 'bcrypt';
@@ -8,6 +9,8 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/database/prisma/prisma.service';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
+import { AuditInterceptor } from '../src/common/interceptors/audit.interceptor';
+import { AuditService } from '../src/modules/audit/audit.service';
 
 export type Credentials = { email: string; password: string };
 
@@ -49,9 +52,23 @@ export async function createTestApp(): Promise<INestApplication<App>> {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  // Mismo orden que main.ts para que los tests ejerciten la auditoría real
+  app.useGlobalInterceptors(
+    new AuditInterceptor(app.get(AuditService)),
+    new ResponseInterceptor(),
+  );
 
   await app.init();
+
+  // Detener los cron: cada suite abre y cierra su propia app, y un job que
+  // dispara después del cierre lo hace contra un cliente Prisma ya
+  // desconectado. Las suites invocan `tick()` directamente, que además es la
+  // forma correcta de probar un job: sin esperar a que pase un minuto.
+  const registry = app.get(SchedulerRegistry);
+  for (const [name] of registry.getCronJobs()) {
+    registry.deleteCronJob(name);
+  }
+
   return app;
 }
 
@@ -78,9 +95,28 @@ export async function seedTestUsers(prisma: PrismaService): Promise<void> {
 }
 
 export async function removeTestUsers(prisma: PrismaService): Promise<void> {
-  await prisma.user.deleteMany({
-    where: { email: { in: [E2E_ADMIN.email, E2E_USER.email] } },
+  await purgeUsers(prisma, {
+    email: { in: [E2E_ADMIN.email, E2E_USER.email] },
   });
+}
+
+/**
+ * Borra usuarios de prueba y lo que cuelga de ellos.
+ *
+ * En producción un usuario nunca se borra —se desactiva— justamente para no
+ * perder su rastro, así que la clave ajena de `audit_logs` es la correcta. Los
+ * tests sí borran de verdad, y por eso tienen que limpiar antes su auditoría.
+ */
+export async function purgeUsers(
+  prisma: PrismaService,
+  where: { email?: { in: string[] }; id?: { in: string[] } },
+): Promise<void> {
+  const users = await prisma.user.findMany({ where, select: { id: true } });
+  const userId = { in: users.map((u) => u.id) };
+
+  await prisma.auditLog.deleteMany({ where: { userId } });
+  await prisma.parkingSession.deleteMany({ where: { userId } });
+  await prisma.user.deleteMany({ where: { id: userId } });
 }
 
 interface LoginResponse {

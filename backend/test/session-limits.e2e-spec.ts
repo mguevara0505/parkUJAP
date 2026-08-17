@@ -10,7 +10,7 @@ import {
   UserStatus,
 } from '@prisma/client';
 import { PrismaService } from '../src/database/prisma/prisma.service';
-import { createTestApp, loginAs } from './e2e-helpers';
+import { createTestApp, loginAs, purgeUsers } from './e2e-helpers';
 
 /**
  * Tope de sesiones activas por categoría (RN-002 revisada).
@@ -105,7 +105,7 @@ describe('Tope de sesiones por categoría (e2e)', () => {
 
   afterAll(async () => {
     await reset();
-    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    await purgeUsers(prisma, { id: { in: userIds } });
     await app.close();
   });
 

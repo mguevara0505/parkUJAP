@@ -1,117 +1,330 @@
 'use client';
 
-import { useAuthStore } from '@/store/auth.store';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { api } from '@/lib/api';
+import { Alert } from '@/components/admin-ui';
+import { errorMessage } from '@/lib/sessions';
+import { STATUS_META, zoneAudience, type UserCategory } from '@/lib/parking';
 
-const kpiCards = [
-  { icon: '🅿️', label: 'Total Puestos', value: '—', color: 'blue' },
-  { icon: '✅', label: 'Disponibles', value: '—', color: 'green' },
-  { icon: '🔴', label: 'Ocupados', value: '—', color: 'red' },
-  { icon: '📅', label: 'Reservados', value: '—', color: 'purple' },
-  { icon: '🚫', label: 'Deshabilitados', value: '—', color: 'gray' },
-  { icon: '🔧', label: 'Mantenimiento', value: '—', color: 'yellow' },
-];
+interface Summary {
+  totalSpaces: number;
+  availableSpaces: number;
+  occupiedSpaces: number;
+  reservedSpaces: number;
+  disabledSpaces: number;
+  maintenanceSpaces: number;
+  occupancyRate: number;
+  availableRate: number;
+  reservationsToday: number;
+  activeSessions: number;
+}
 
-const colorMap: Record<string, string> = {
-  blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-  green: 'bg-green-500/10 border-green-500/20 text-green-400',
-  red: 'bg-red-500/10 border-red-500/20 text-red-400',
-  purple: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
-  gray: 'bg-slate-500/10 border-slate-500/20 text-slate-400',
-  yellow: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400',
-};
+interface ZoneRow {
+  id: string;
+  code: string;
+  name: string;
+  allowedCategories: UserCategory[];
+  totalSpaces: number;
+  availableSpaces: number;
+  occupiedSpaces: number;
+  reservedSpaces: number;
+  maintenanceSpaces: number;
+  occupancyRate: number;
+}
 
+/** Pantalla A01 — Dashboard administrativo (CU-013). */
 export default function AdminDashboardPage() {
-  const { user } = useAuthStore();
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [zones, setZones] = useState<ZoneRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void Promise.all([
+      api.get<{ data: Summary }>('/dashboard/summary'),
+      api.get<{ data: ZoneRow[] }>('/dashboard/zones'),
+    ])
+      .then(([s, z]) => {
+        if (cancelled) return;
+        setSummary(s.data.data);
+        setZones(z.data.data);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(errorMessage(err, 'No se pudo cargar el panel'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">
-          Bienvenido, {user?.firstName} 👋
-        </h1>
+      <header className="mb-8">
+        <h1 className="text-2xl font-bold text-white">Panel de control</h1>
         <p className="text-slate-400 mt-1">
-          Panel de control — Universidad José Antonio Páez
+          Universidad José Antonio Páez — estado del estacionamiento
         </p>
-      </div>
+      </header>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-        {kpiCards.map((card) => (
-          <div
-            key={card.label}
-            className={`border rounded-2xl p-5 ${colorMap[card.color]}`}
-          >
-            <div className="text-2xl mb-2">{card.icon}</div>
-            <div className="text-2xl font-bold text-white mb-1">{card.value}</div>
-            <div className="text-xs font-medium opacity-80">{card.label}</div>
+      {error && (
+        <div className="mb-6">
+          <Alert>{error}</Alert>
+        </div>
+      )}
+
+      {loading && !summary && (
+        <p className="text-slate-400 text-sm">Cargando indicadores…</p>
+      )}
+
+      {summary && (
+        <>
+          {/* KPIs de la sección 22 */}
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+            <Kpi
+              label="Total de puestos"
+              value={summary.totalSpaces}
+              icon="🅿️"
+              className="bg-white/5 border-white/10 text-slate-300"
+            />
+            <Kpi
+              label="Disponibles"
+              value={summary.availableSpaces}
+              icon={STATUS_META.AVAILABLE.icon}
+              className={STATUS_META.AVAILABLE.className}
+            />
+            <Kpi
+              label="Ocupados"
+              value={summary.occupiedSpaces}
+              icon={STATUS_META.OCCUPIED.icon}
+              className={STATUS_META.OCCUPIED.className}
+            />
+            <Kpi
+              label="Reservados"
+              value={summary.reservedSpaces}
+              icon={STATUS_META.RESERVED.icon}
+              className={STATUS_META.RESERVED.className}
+            />
+            <Kpi
+              label="Deshabilitados"
+              value={summary.disabledSpaces}
+              icon={STATUS_META.DISABLED.icon}
+              className={STATUS_META.DISABLED.className}
+            />
+            <Kpi
+              label="Mantenimiento"
+              value={summary.maintenanceSpaces}
+              icon={STATUS_META.MAINTENANCE.icon}
+              className={STATUS_META.MAINTENANCE.className}
+            />
           </div>
-        ))}
-      </div>
 
-      {/* Ocupación */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h2 className="text-white font-semibold mb-4">📊 Ocupación Global</h2>
-          <div className="flex items-center gap-4">
-            <div className="relative w-24 h-24">
-              <svg viewBox="0 0 36 36" className="w-24 h-24 -rotate-90">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#3b82f6" strokeWidth="3"
-                  strokeDasharray="0 100" strokeLinecap="round" />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-white font-bold text-lg">—%</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            {/* Ocupación global */}
+            <section className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <h2 className="text-white font-semibold mb-4">
+                Ocupación global
+              </h2>
+              <div className="flex items-center gap-5">
+                <OccupancyRing rate={summary.occupancyRate} />
+                <dl className="space-y-1.5 text-sm">
+                  <Row
+                    label="Ocupados"
+                    value={`${summary.occupiedSpaces.toLocaleString('es-VE')} (${summary.occupancyRate}%)`}
+                  />
+                  <Row
+                    label="Libres"
+                    value={`${summary.availableSpaces.toLocaleString('es-VE')} (${summary.availableRate}%)`}
+                  />
+                  <Row
+                    label="Sesiones activas"
+                    value={summary.activeSessions.toLocaleString('es-VE')}
+                  />
+                </dl>
               </div>
-            </div>
-            <div className="text-sm text-slate-400">
-              Los datos de ocupación estarán disponibles cuando se implemente el módulo de puestos (Sprint 3).
-            </div>
-          </div>
-        </div>
+            </section>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h2 className="text-white font-semibold mb-4">🕐 Actividad Reciente</h2>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/3">
-                <div className="w-8 h-8 rounded-lg bg-slate-700 animate-pulse" />
-                <div className="flex-1 space-y-1">
-                  <div className="h-3 bg-slate-700 rounded animate-pulse w-3/4" />
-                  <div className="h-2 bg-slate-800 rounded animate-pulse w-1/2" />
-                </div>
-              </div>
-            ))}
-            <p className="text-center text-slate-500 text-xs mt-2">
-              Disponible en Sprint 10 — Dashboard + Auditoría
-            </p>
-          </div>
-        </div>
-      </div>
+            {/* Hoy */}
+            <section className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <h2 className="text-white font-semibold mb-4">Hoy</h2>
+              <p className="text-4xl font-bold text-white tabular-nums">
+                {summary.reservationsToday.toLocaleString('es-VE')}
+              </p>
+              <p className="text-slate-400 text-sm mt-1">
+                {summary.reservationsToday === 1
+                  ? 'reserva cubre algún momento de hoy'
+                  : 'reservas cubren algún momento de hoy'}
+              </p>
+              <Link
+                href="/admin/reservations"
+                className="inline-block mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium"
+              >
+                Ver reservas →
+              </Link>
+            </section>
 
-      {/* Acciones rápidas */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <h2 className="text-white font-semibold mb-4">⚡ Acciones Rápidas</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { icon: '📅', label: 'Nueva Reserva', href: '/admin/reservations' },
-            { icon: '👥', label: 'Nuevo Visitante', href: '/admin/visitors' },
-            { icon: '🔧', label: 'Mantenimiento', href: '/admin/maintenance' },
-            { icon: '🗺️', label: 'Ver Mapa', href: '/admin/map' },
-          ].map((action) => (
-            <a
-              key={action.label}
-              href={action.href}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all text-center group"
-            >
-              <span className="text-2xl group-hover:scale-110 transition-transform">
-                {action.icon}
-              </span>
-              <span className="text-slate-300 text-xs font-medium">{action.label}</span>
-            </a>
-          ))}
-        </div>
+            {/* Fuera de servicio */}
+            <section className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <h2 className="text-white font-semibold mb-4">
+                Fuera de servicio
+              </h2>
+              <p className="text-4xl font-bold text-white tabular-nums">
+                {(
+                  summary.maintenanceSpaces + summary.disabledSpaces
+                ).toLocaleString('es-VE')}
+              </p>
+              <p className="text-slate-400 text-sm mt-1">
+                {summary.maintenanceSpaces} en mantenimiento ·{' '}
+                {summary.disabledSpaces} deshabilitados
+              </p>
+              <Link
+                href="/admin/maintenance"
+                className="inline-block mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium"
+              >
+                Ver bloqueos →
+              </Link>
+            </section>
+          </div>
+
+          {/* Ocupación por zona */}
+          <section className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+            <h2 className="text-white font-semibold p-6 pb-4">
+              Ocupación por zona
+            </h2>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Ocupación por zona</caption>
+                <thead className="bg-white/5 text-slate-400 text-xs uppercase tracking-wider">
+                  <tr>
+                    <th scope="col" className="text-left px-6 py-3">Zona</th>
+                    <th scope="col" className="text-left px-6 py-3">Para</th>
+                    <th scope="col" className="text-right px-6 py-3">Total</th>
+                    <th scope="col" className="text-right px-6 py-3">Libres</th>
+                    <th scope="col" className="text-right px-6 py-3">Ocupados</th>
+                    <th scope="col" className="text-left px-6 py-3 w-48">
+                      Ocupación
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {zones.map((zone) => (
+                    <tr key={zone.id}>
+                      <td className="px-6 py-3">
+                        <span className="font-mono text-blue-400">
+                          {zone.code}
+                        </span>{' '}
+                        <span className="text-slate-400">{zone.name}</span>
+                      </td>
+                      <td className="px-6 py-3 text-slate-400">
+                        {zoneAudience(zone.allowedCategories)}
+                      </td>
+                      <td className="px-6 py-3 text-right text-slate-300 tabular-nums">
+                        {zone.totalSpaces}
+                      </td>
+                      <td className="px-6 py-3 text-right text-green-400 tabular-nums">
+                        {zone.availableSpaces}
+                      </td>
+                      <td className="px-6 py-3 text-right text-red-400 tabular-nums">
+                        {zone.occupiedSpaces}
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden"
+                            role="img"
+                            aria-label={`${zone.occupancyRate}% de ocupación`}
+                          >
+                            <div
+                              className="h-full bg-red-500/70 rounded-full"
+                              style={{ width: `${zone.occupancyRate}%` }}
+                            />
+                          </div>
+                          {/* El número acompaña a la barra: no depender del color */}
+                          <span className="text-xs text-slate-400 tabular-nums w-9 text-right">
+                            {zone.occupancyRate}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Kpi({
+  label,
+  value,
+  icon,
+  className,
+}: {
+  label: string;
+  value: number;
+  icon: string;
+  className: string;
+}) {
+  return (
+    <div className={`border rounded-2xl p-5 ${className}`}>
+      <div className="text-lg mb-1">{icon}</div>
+      <div className="text-2xl font-bold text-white tabular-nums">
+        {value.toLocaleString('es-VE')}
       </div>
+      <div className="text-xs font-medium opacity-80 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+/** Anillo de ocupación con el porcentaje escrito dentro (secciones 18 y 47). */
+function OccupancyRing({ rate }: { rate: number }) {
+  return (
+    <div className="relative w-24 h-24 shrink-0">
+      <svg viewBox="0 0 36 36" className="w-24 h-24 -rotate-90">
+        <circle
+          cx="18"
+          cy="18"
+          r="15.9"
+          fill="none"
+          stroke="rgba(255,255,255,0.1)"
+          strokeWidth="3"
+        />
+        <circle
+          cx="18"
+          cy="18"
+          r="15.9"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="3"
+          strokeDasharray={`${rate} 100`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-white font-bold text-lg tabular-nums">
+          {rate}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-6">
+      <dt className="text-slate-400">{label}</dt>
+      <dd className="text-white tabular-nums">{value}</dd>
     </div>
   );
 }

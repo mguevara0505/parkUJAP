@@ -4,7 +4,7 @@ import { App } from 'supertest/types';
 import * as bcrypt from 'bcrypt';
 import { Role, SessionStatus, SpaceStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '../src/database/prisma/prisma.service';
-import { createTestApp, loginAs } from './e2e-helpers';
+import { createTestApp, loginAs, purgeUsers } from './e2e-helpers';
 
 /**
  * E2E Sprint 6 — concurrencia y consistencia.
@@ -77,7 +77,7 @@ describe('Concurrencia (e2e)', () => {
     await prisma.parkingSession.deleteMany({
       where: { userId: { in: userIds } },
     });
-    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    await purgeUsers(prisma, { id: { in: userIds } });
     await prisma.parkingSpace.updateMany({
       where: { code: { startsWith: 'C-0' } },
       data: { status: SpaceStatus.AVAILABLE },

@@ -8,6 +8,8 @@ import cookieParser from 'cookie-parser';
 
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { AuditService } from './modules/audit/audit.service';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -43,7 +45,13 @@ async function bootstrap() {
 
   // Filtros e interceptores globales
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  // El primero registrado es el más externo, así que el de auditoría recibe la
+  // respuesta ya envuelta en { success, data }. Su extractor de id contempla
+  // las dos formas, con envoltorio y sin él.
+  app.useGlobalInterceptors(
+    new AuditInterceptor(app.get(AuditService)),
+    new ResponseInterceptor(),
+  );
 
   // Swagger / OpenAPI
   const swaggerConfig = new DocumentBuilder()

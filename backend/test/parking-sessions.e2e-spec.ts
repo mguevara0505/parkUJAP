@@ -9,6 +9,7 @@ import {
   E2E_USER,
   createTestApp,
   loginAs,
+  purgeUsers,
   removeTestUsers,
   seedTestUsers,
 } from './e2e-helpers';
@@ -107,8 +108,8 @@ describe('Parking Sessions (e2e)', () => {
       ...RIVALS.map((r) => r.email),
     ];
     await clearSessionsOf(emails);
-    await prisma.user.deleteMany({
-      where: { email: { in: RIVALS.map((r) => r.email) } },
+    await purgeUsers(prisma, {
+      email: { in: RIVALS.map((r) => r.email) },
     });
     await removeTestUsers(prisma);
 

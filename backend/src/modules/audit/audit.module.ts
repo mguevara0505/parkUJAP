@@ -1,13 +1,15 @@
-﻿import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
+import { AuditController } from './audit.controller';
+import { AuditService } from './audit.service';
 
 /**
- * Módulo Audit
- * Se implementará en sprints posteriores.
- * Estructura base creada en Sprint 0.
+ * Global: el interceptor de auditoría se registra en AppModule y necesita
+ * AuditService sin que cada módulo tenga que importarlo.
  */
+@Global()
 @Module({
-  controllers: [],
-  providers: [],
-  exports: [],
+  controllers: [AuditController],
+  providers: [AuditService],
+  exports: [AuditService],
 })
 export class AuditModule {}

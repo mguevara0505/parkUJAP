@@ -10,7 +10,7 @@ import {
   UserStatus,
 } from '@prisma/client';
 import { PrismaService } from '../src/database/prisma/prisma.service';
-import { createTestApp, loginAs } from './e2e-helpers';
+import { createTestApp, loginAs, purgeUsers } from './e2e-helpers';
 
 /**
  * Reparto de zonas por categoría de usuario.
@@ -99,7 +99,7 @@ describe('Zonas por categoría (e2e)', () => {
     await prisma.reservation.deleteMany({
       where: { parkingSpace: { code: { in: Object.values(SPACE_OF_ZONE) } } },
     });
-    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    await purgeUsers(prisma, { id: { in: userIds } });
     await prisma.parkingSpace.updateMany({
       where: { code: { in: Object.values(SPACE_OF_ZONE) } },
       data: { status: SpaceStatus.AVAILABLE },
