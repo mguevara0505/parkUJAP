@@ -4,10 +4,13 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
+import { SessionLoading } from '@/components/admin-ui';
 
 const adminNav = [
   { href: '/admin/dashboard', icon: '📊', label: 'Dashboard' },
   { href: '/admin/map', icon: '🗺️', label: 'Mapa de Puestos' },
+  { href: '/admin/parking-lots', icon: '🏛️', label: 'Estacionamientos' },
+  { href: '/admin/zones', icon: '🔠', label: 'Zonas' },
   { href: '/admin/reservations', icon: '📅', label: 'Reservas' },
   { href: '/admin/visitors', icon: '👥', label: 'Visitantes' },
   { href: '/admin/maintenance', icon: '🔧', label: 'Mantenimiento' },
@@ -18,18 +21,21 @@ const adminNav = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, logout, isAdmin } = useAuthStore();
+  const { user, logout, isAdmin, hydrated } = useAuthStore();
 
   useEffect(() => {
+    // Esperar la rehidratación: antes de ella `user` siempre es null
+    if (!hydrated) return;
     if (!user) { router.push('/login'); return; }
     if (!isAdmin()) { router.push('/dashboard'); }
-  }, [user, router, isAdmin]);
+  }, [hydrated, user, router, isAdmin]);
 
   const handleLogout = async () => {
     await logout();
     router.push('/login');
   };
 
+  if (!hydrated) return <SessionLoading />;
   if (!user || !isAdmin()) return null;
 
   return (

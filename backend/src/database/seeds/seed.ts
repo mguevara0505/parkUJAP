@@ -98,6 +98,56 @@ async function main() {
 
   console.log('\n✅ 20 usuarios creados\n');
 
+  // ────────────────────────────────────────────
+  // 3. ESTACIONAMIENTO (sección 8.2)
+  // ────────────────────────────────────────────
+  const lot = await prisma.parkingLot.upsert({
+    where: { code: 'PRINCIPAL' },
+    update: {},
+    create: {
+      name: 'Estacionamiento Principal',
+      code: 'PRINCIPAL',
+      description:
+        'Estacionamiento principal de la Universidad José Antonio Páez',
+      location: 'Av. Universidad, entrada principal',
+    },
+  });
+
+  console.log(`✅ Estacionamiento creado: ${lot.code} — ${lot.name}`);
+
+  // ────────────────────────────────────────────
+  // 4. ZONAS (sección 8.3) — 10 zonas, códigos A..J
+  // ────────────────────────────────────────────
+  const zones = [
+    { code: 'A', name: 'Zona A', description: 'Cercana al edificio principal' },
+    { code: 'B', name: 'Zona B', description: 'Frente a la biblioteca' },
+    { code: 'C', name: 'Zona C', description: 'Lateral este' },
+    { code: 'D', name: 'Zona D', description: 'Lateral oeste' },
+    { code: 'E', name: 'Zona E', description: 'Área deportiva' },
+    { code: 'F', name: 'Zona F', description: 'Zona techada' },
+    { code: 'G', name: 'Zona G', description: 'Zona de profesores' },
+    { code: 'H', name: 'Zona H', description: 'Zona administrativa' },
+    { code: 'I', name: 'Zona I', description: 'Zona de visitantes' },
+    { code: 'J', name: 'Zona J', description: 'Zona VIP y autoridades' },
+  ];
+
+  for (const [index, zone] of zones.entries()) {
+    await prisma.parkingZone.upsert({
+      where: { code: zone.code },
+      update: {},
+      create: {
+        ...zone,
+        parkingLotId: lot.id,
+        floor: 1,
+        sortOrder: index + 1,
+      },
+    });
+
+    process.stdout.write(`  🅿️  ${zone.code} → ${zone.name}\n`);
+  }
+
+  console.log('\n✅ 10 zonas creadas\n');
+
   console.log('🎉 Seed completado correctamente!\n');
   console.log('─'.repeat(50));
   console.log('  Admin:    admin@ujap.edu.ve    / Admin1234!');

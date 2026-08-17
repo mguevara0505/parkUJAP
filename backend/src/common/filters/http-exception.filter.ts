@@ -7,6 +7,85 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
+
+/**
+ * Extrae los campos que violaron una restricción única.
+ *
+ * Prisma expone esto en dos formatos según el motor: `meta.target` con el
+ * cliente clásico, y `meta.driverAdapterError.cause.constraint.fields` cuando
+ * se usa un driver adapter como PrismaPg (nuestro caso). Se soportan ambos
+ * para que el mensaje no diga "undefined" si cambia la configuración.
+ */
+function uniqueConstraintFields(
+  meta: Record<string, unknown> | undefined,
+): string | null {
+  const target = meta?.target;
+  if (Array.isArray(target)) return target.join(', ');
+  if (typeof target === 'string') return target;
+
+  const constraint = (
+    meta?.driverAdapterError as
+      | { cause?: { constraint?: { fields?: string[]; index?: string } } }
+      | undefined
+  )?.cause?.constraint;
+
+  if (Array.isArray(constraint?.fields)) return constraint.fields.join(', ');
+  if (typeof constraint?.index === 'string') return constraint.index;
+
+  return null;
+}
+
+/**
+ * Traduce errores conocidos de Prisma al formato de error de la sección 31.
+ * Vive en el filtro global para que ningún módulo tenga que repetir este mapeo.
+ * Referencia de códigos: https://www.prisma.io/docs/reference/api-reference/error-reference
+ */
+function translatePrismaError(e: Prisma.PrismaClientKnownRequestError) {
+  switch (e.code) {
+    case 'P2002': {
+      // Violación de restricción única — p. ej. dos puestos con el mismo código
+      const fields = uniqueConstraintFields(e.meta);
+      return {
+        statusCode: HttpStatus.CONFLICT,
+        error: 'Conflict',
+        code: 'UNIQUE_CONSTRAINT_VIOLATION',
+        message: fields
+          ? `Ya existe un registro con ese valor en: ${fields}`
+          : 'Ya existe un registro con ese valor único',
+      };
+    }
+    case 'P2025':
+      return {
+        statusCode: HttpStatus.NOT_FOUND,
+        error: 'Not Found',
+        code: 'RECORD_NOT_FOUND',
+        message: 'El registro solicitado no existe',
+      };
+    case 'P2003':
+      return {
+        statusCode: HttpStatus.BAD_REQUEST,
+        error: 'Bad Request',
+        code: 'FOREIGN_KEY_CONSTRAINT_VIOLATION',
+        message: 'La referencia indicada no existe',
+      };
+    case 'P2014':
+      return {
+        statusCode: HttpStatus.CONFLICT,
+        error: 'Conflict',
+        code: 'RELATION_CONSTRAINT_VIOLATION',
+        message:
+          'La operación rompería una relación existente. Desactive el registro en lugar de eliminarlo',
+      };
+    default:
+      return {
+        statusCode: HttpStatus.BAD_REQUEST,
+        error: 'Bad Request',
+        code: `PRISMA_${e.code}`,
+        message: 'La operación no pudo completarse en la base de datos',
+      };
+  }
+}
 
 /**
  * Filtro global de excepciones HTTP.
@@ -40,6 +119,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
         error = exception.name;
         code = this.getErrorCode(statusCode);
       }
+    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      // La restricción de la base de datos es la autoridad final: validar antes
+      // con un SELECT sería una condición de carrera (sección 25).
+      ({ statusCode, error, code, message } = translatePrismaError(exception));
     } else if (exception instanceof Error) {
       message = exception.message;
       this.logger.error(

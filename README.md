@@ -63,7 +63,7 @@ docker compose up -d postgres
 cd backend
 npm install
 npx prisma migrate deploy   # aplica las migraciones existentes
-npm run seed                # 1 admin + 20 usuarios de prueba
+npm run seed                # 1 admin, 20 usuarios, 1 estacionamiento, 10 zonas
 npm run start:dev
 
 # 3. Frontend (otra terminal)
@@ -139,8 +139,8 @@ ujap-parking/
 |--------|-------------|--------|
 | 0 | Preparación y estructura base | ✅ Completado |
 | 1 | Autenticación + Usuarios | ✅ Completado |
-| 2 | Estacionamientos + Zonas | ⏳ En curso |
-| 3 | Puestos (~1.000) | ⏳ Pendiente |
+| 2 | Estacionamientos + Zonas | ✅ Completado |
+| 3 | Puestos (~1.000) | ⏳ En curso |
 | 4 | Mapa Visual (SVG) | ⏳ Pendiente |
 | 5 | Check-in / Check-out | ⏳ Pendiente |
 | 6 | Concurrencia | ⏳ Pendiente |

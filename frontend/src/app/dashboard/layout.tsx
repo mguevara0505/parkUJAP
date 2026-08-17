@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
+import { SessionLoading } from '@/components/admin-ui';
 
 const userNav = [
   { href: '/dashboard', icon: '🏠', label: 'Inicio' },
@@ -15,17 +16,20 @@ const userNav = [
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const { user, logout, hydrated } = useAuthStore();
 
   useEffect(() => {
+    // Esperar la rehidratación: antes de ella `user` siempre es null
+    if (!hydrated) return;
     if (!user) router.push('/login');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   const handleLogout = async () => {
     await logout();
     router.push('/login');
   };
 
+  if (!hydrated) return <SessionLoading />;
   if (!user) return null;
 
   return (

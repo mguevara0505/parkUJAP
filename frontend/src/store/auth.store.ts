@@ -28,6 +28,13 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isLoading: boolean;
+  /**
+   * `false` hasta que zustand termina de leer localStorage. Sin esta bandera,
+   * en el primer render `user` es null y los layouts redirigirían a /login en
+   * cada carga directa o refresco de página, aunque la sesión sea válida.
+   */
+  hydrated: boolean;
+  setHydrated: () => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   loadMe: () => Promise<void>;
@@ -41,6 +48,8 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isLoading: false,
+      hydrated: false,
+      setHydrated: () => set({ hydrated: true }),
 
       login: async (email, password) => {
         set({ isLoading: true });
@@ -89,11 +98,13 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'ujap-auth',
+      // `hydrated` nunca se persiste: describe esta carga de página, no la sesión
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
       }),
+      onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
   ),
 );
