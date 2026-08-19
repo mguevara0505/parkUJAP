@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push nuevo cancela el CI del anterior: no tiene sentido gastar minutos
+# validando un commit que ya quedó atrás.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    # Los e2e son de verdad contra PostgreSQL: las reglas de negocio (RN-001,
+    # RN-002, RN-006) viven en índices y restricciones EXCLUDE, así que una
+    # base simulada no probaría nada de lo que importa.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ujap_user
+          POSTGRES_PASSWORD: ujap_password
+          POSTGRES_DB: ujap_parking_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ujap_user -d ujap_parking_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ujap_user:ujap_password@localhost:5432/ujap_parking_db?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      LOGIN_MAX_ATTEMPTS: 10000
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      # `migrate deploy` aplica las migraciones tal cual están, sin proponer
+      # cambios. Es lo que evita que el CI toque los índices parciales y la
+      # restricción EXCLUDE escritos a mano.
+      - run: npx prisma migrate deploy
+
+      - run: npm run seed
+
+      - run: npx tsc --noEmit
+
+      - run: npx eslint "{src,test}/**/*.ts"
+
+      - run: npm test
+
+      # --runInBand: las specs comparten la base y en paralelo se pisan
+      - run: npm run test:e2e
+
+  frontend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+
+      - run: npm run lint
+
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1

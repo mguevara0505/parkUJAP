@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  // prisma.config.ts vive en la raíz y solo lo usa el CLI de Prisma. Si entra
+  // en la compilación, el directorio común pasa a ser la raíz y la salida se
+  // vuelve dist/src/main.js, con lo que `node dist/main` deja de encontrarse.
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "prisma.config.ts",
+    "**/*spec.ts"
+  ]
+}

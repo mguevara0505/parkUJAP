@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────
+# UJAP Parking — .gitignore
+# ─────────────────────────────────────────────
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Entorno (NUNCA commitear archivos .env con secretos)
+.env
+.env.development
+.env.production
+.env.test
+.env.local
+
+# Build
+dist/
+build/
+.next/
+out/
+
+# Prisma
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+# .dockerignore SÍ se versiona: sin él, `COPY . .` mete el node_modules de
+# Windows dentro de la imagen Linux y cambia la salida del build. Ignorarlo
+# hacía que las imágenes solo se construyeran bien en esta máquina.
+
+# Temporales
+tmp/
+temp/
+backups/

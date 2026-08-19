@@ -1,0 +1,358 @@
+// UJAP Parking — Prisma Schema
+// Fuente: DOCUMENTO_MAESTRO_UJAP_PARKING.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+/// Categoría del miembro de la universidad. `Role` decide QUÉ puede hacer
+/// (USER o ADMIN); `UserCategory` decide DÓNDE puede estacionarse.
+/// Los visitantes externos no son User: acceden mediante una reserva.
+enum UserCategory {
+  STUDENT
+  PROFESSOR
+  STAFF
+}
+
+enum SpaceType {
+  STANDARD
+  VISITOR
+  PROFESSOR
+  STAFF
+  ACCESSIBLE
+  VIP
+  MOTORCYCLE
+  OTHER
+}
+
+enum SpaceStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  DISABLED
+  MAINTENANCE
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SessionSource {
+  WEB
+  MOBILE
+  ADMIN
+}
+
+enum ReservationType {
+  VISITOR
+  EVENT
+  PROFESSOR
+  AUTHORITY
+  STAFF
+  EXTERNAL
+  OTHER
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum MaintenanceReason {
+  PAINTING
+  MAINTENANCE
+  CONSTRUCTION
+  SECURITY
+  EVENT
+  OTHER
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// MODELOS
+// ─────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(uuid())
+  firstName    String
+  lastName     String
+  email        String       @unique
+  passwordHash String
+  role         Role         @default(USER)
+  category     UserCategory @default(STUDENT)
+  universityId String?
+  documentId   String?
+  phone        String?
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relaciones
+  parkingSessions    ParkingSession[]
+  reservationsAdmin  Reservation[]      @relation("AdminReservations")
+  reservationsUser   Reservation[]      @relation("UserReservations")
+  maintenanceBlocks  MaintenanceBlock[]
+  auditLogs          AuditLog[]
+  refreshTokens      RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model ParkingLot {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+  location    String?
+  totalSpaces Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  zones ParkingZone[]
+
+  @@map("parking_lots")
+}
+
+model ParkingZone {
+  id           String   @id @default(uuid())
+  parkingLotId String
+  name         String
+  code         String   @unique
+  description  String?
+  floor        Int?     @default(1)
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  /// Categorías que pueden estacionarse aquí por su cuenta.
+  /// Una lista VACÍA significa "solo por reserva": nadie se registra por
+  /// iniciativa propia y el puesto se asigna desde una reserva administrativa
+  /// (autoridades, proveedores, eventos). Así no hace falta una bandera aparte.
+  allowedCategories UserCategory[]
+
+  // Relaciones
+  parkingLot ParkingLot     @relation(fields: [parkingLotId], references: [id])
+  spaces     ParkingSpace[]
+
+  @@map("parking_zones")
+}
+
+model ParkingSpace {
+  id           String      @id @default(uuid())
+  zoneId       String
+  code         String      @unique
+  number       Int
+  type         SpaceType   @default(STANDARD)
+  status       SpaceStatus @default(AVAILABLE)
+  isAccessible Boolean     @default(false)
+  isCovered    Boolean     @default(false)
+  priority     Int         @default(3)
+  positionX    Float       @default(0)
+  positionY    Float       @default(0)
+  width        Float       @default(60)
+  height       Float       @default(100)
+  rotation     Float       @default(0)
+  metadata     Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relaciones
+  zone              ParkingZone        @relation(fields: [zoneId], references: [id])
+  sessions          ParkingSession[]
+  reservations      Reservation[]
+  maintenanceBlocks MaintenanceBlock[]
+
+  @@index([status])
+  @@index([zoneId])
+  @@index([code])
+  @@map("parking_spaces")
+}
+
+/// RN-001 y RN-002 se aplican con dos índices únicos PARCIALES creados a mano
+/// (migraciones ..._active_session_partial_unique_indexes y ..._session_slots):
+///   - parking_sessions_one_active_per_user_slot ("userId","slot" WHERE status = 'ACTIVE')
+///   - parking_sessions_one_active_per_space     ("parkingSpaceId" WHERE status = 'ACTIVE')
+/// Prisma no puede expresar la cláusula WHERE, así que no aparecen abajo.
+/// IMPORTANTE: si `prisma migrate dev` propone eliminarlos, no aceptar.
+model ParkingSession {
+  id             String        @id @default(uuid())
+  userId         String
+  parkingSpaceId String
+  reservationId  String?
+  /// Cupo del usuario que ocupa esta sesión (1..N según su categoría).
+  /// Ver la migración 20260817220000_session_slots.
+  slot           Int           @default(1)
+  checkInAt      DateTime      @default(now())
+  checkOutAt     DateTime?
+  status         SessionStatus @default(ACTIVE)
+  source         SessionSource @default(WEB)
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relaciones
+  user         User         @relation(fields: [userId], references: [id])
+  parkingSpace ParkingSpace @relation(fields: [parkingSpaceId], references: [id])
+  reservation  Reservation? @relation(fields: [reservationId], references: [id])
+
+  @@index([userId])
+  @@index([parkingSpaceId])
+  @@index([status])
+  @@map("parking_sessions")
+}
+
+/// RN-006 se aplica con una restricción EXCLUDE creada a mano en la migración
+/// 20260817185004_reservation_no_overlap_exclusion: dos reservas vigentes
+/// (PENDING, CONFIRMED, ACTIVE) del mismo puesto no pueden solaparse. El rango
+/// es semiabierto, así que las reservas consecutivas sí se permiten (sección 44).
+/// Incluye además un CHECK de endAt > startAt.
+/// Prisma no puede expresar EXCLUDE ni CHECK, así que no aparecen abajo.
+/// IMPORTANTE: si `prisma migrate dev` propone eliminarlos, no aceptar.
+model Reservation {
+  id                 String            @id @default(uuid())
+  parkingSpaceId     String
+  createdByAdminId   String
+  visitorId          String?
+  userId             String?
+  title              String
+  description        String?
+  reservationType    ReservationType   @default(VISITOR)
+  startAt            DateTime
+  endAt              DateTime
+  status             ReservationStatus @default(PENDING)
+  priority           Int               @default(3)
+  vehiclePlate       String?
+  vehicleDescription String?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  // Relaciones
+  parkingSpace   ParkingSpace     @relation(fields: [parkingSpaceId], references: [id])
+  createdByAdmin User             @relation("AdminReservations", fields: [createdByAdminId], references: [id])
+  visitor        Visitor?         @relation(fields: [visitorId], references: [id])
+  user           User?            @relation("UserReservations", fields: [userId], references: [id])
+  sessions       ParkingSession[]
+
+  @@index([parkingSpaceId])
+  @@index([startAt])
+  @@index([endAt])
+  @@index([status])
+  @@map("reservations")
+}
+
+/// `documentId` es único cuando se informa: la cédula identifica a la persona
+/// y dos fichas con la misma crearían visitantes duplicados que el
+/// administrador no podría distinguir al buscar (sección 59, riesgo 5).
+/// En PostgreSQL varios NULL no colisionan, así que el campo sigue siendo
+/// opcional para visitantes de los que solo se tiene el nombre.
+model Visitor {
+  id             String   @id @default(uuid())
+  firstName      String
+  lastName       String
+  documentId     String?  @unique
+  email          String?
+  phone          String?
+  organization   String?
+  vehiclePlate   String?
+  vehicleBrand   String?
+  vehicleModel   String?
+  vehicleColor   String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relaciones
+  reservations Reservation[]
+
+  @@map("visitors")
+}
+
+model MaintenanceBlock {
+  id             String            @id @default(uuid())
+  parkingSpaceId String
+  createdById    String
+  reason         MaintenanceReason @default(MAINTENANCE)
+  description    String?
+  startAt        DateTime
+  endAt          DateTime
+  status         MaintenanceStatus @default(SCHEDULED)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  // Relaciones
+  parkingSpace ParkingSpace @relation(fields: [parkingSpaceId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@index([parkingSpaceId])
+  @@index([startAt])
+  @@index([endAt])
+  @@map("maintenance_blocks")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  // Relaciones
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

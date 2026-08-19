@@ -1,0 +1,101 @@
+# ─────────────────────────────────────────────────────────
+# UJAP Parking — Docker Compose (Desarrollo)
+# Servicios: api + postgres + frontend + pgadmin
+# ─────────────────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL ────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ujap_parking_postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: ujap_user
+      POSTGRES_PASSWORD: ujap_password
+      POSTGRES_DB: ujap_parking_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ujap_user -d ujap_parking_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ujap_network
+
+  # ── NestJS API ────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder          # En dev usamos el stage de build con hot reload
+    container_name: ujap_parking_api
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://ujap_user:ujap_password@postgres:5432/ujap_parking_db?schema=public
+      JWT_ACCESS_SECRET: ujap-parking-access-secret-dev
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_SECRET: ujap-parking-refresh-secret-dev
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CORS_ORIGIN: http://localhost:3000
+    volumes:
+      - ./backend/src:/app/src       # Hot reload en desarrollo
+      - ./backend/prisma:/app/prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npm run start:dev"
+    networks:
+      - ujap_network
+
+  # ── Next.js Frontend ──────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ujap_parking_frontend
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+    depends_on:
+      - api
+    networks:
+      - ujap_network
+
+  # ── pgAdmin (administración visual de BD) ─────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ujap_parking_pgadmin
+    restart: unless-stopped
+    ports:
+      - '5050:80'
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ujap.edu.ve
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - ujap_network
+
+# ── Volúmenes persistentes ─────────────────────────────
+volumes:
+  postgres_data:
+    name: ujap_parking_postgres_data
+  pgadmin_data:
+    name: ujap_parking_pgadmin_data
+
+# ── Red interna ────────────────────────────────────────
+networks:
+  ujap_network:
+    name: ujap_parking_network
+    driver: bridge
