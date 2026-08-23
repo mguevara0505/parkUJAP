@@ -218,9 +218,9 @@ por el mismo puesto produzcan **exactamente una** ocupación.
 
 | Medida | Objetivo | p50 | p95 |
 |--------|----------|-----|-----|
-| `GET /parking-spaces/map` | < 500 ms | 258 ms | 411 ms |
-| `GET /dashboard/summary` | < 1 s | 52 ms | 61 ms |
-| `POST /parking-sessions/check-in` | < 500 ms | 471 ms | 483 ms |
+| `GET /parking-spaces/map` | < 500 ms | 186 ms | 323 ms |
+| `GET /dashboard/summary` | < 1 s | 42 ms | 50 ms |
+| `POST /parking-sessions/check-in` | < 500 ms | 381 ms | 393 ms |
 
 Los tiempos son los del **último de 100 peticiones en cola**, no los de una
 petición aislada.
@@ -230,4 +230,3 @@ petición aislada.
 ## 📄 Licencia
 
 Proyecto académico — Universidad José Antonio Páez.
-a dormir un ratico profe
