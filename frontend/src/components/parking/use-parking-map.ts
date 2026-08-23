@@ -61,6 +61,9 @@ export const EMPTY_FILTERS: MapFilters = {
  * checkbox. Con 1.000 puestos el filtrado en memoria es instantáneo, y el botón
  * de actualizar cubre el refresco explícito (sección 28: REST + refetch).
  */
+/** Cada cuánto se vuelve a pedir el plano estando la pantalla visible. */
+const REFRESH_MS = 30_000;
+
 export function useParkingMap(parkingLotId?: string) {
   const [all, setAll] = useState<MapSpace[]>([]);
   const [zones, setZones] = useState<MapZone[]>([]);
@@ -121,6 +124,38 @@ export function useParkingMap(parkingLotId?: string) {
     } finally {
       setLoading(false);
     }
+  }, [fetchMap, apply]);
+
+  /**
+   * Refresco automático mientras la pantalla está a la vista.
+   *
+   * Un puesto que estaba libre hace cinco minutos ya no lo está, y quien busca
+   * sitio no debería tener que acordarse de pulsar «Actualizar». Cuesta poco:
+   * el backend cachea el mapa cinco segundos, así que varias pestañas abiertas
+   * comparten la misma consulta.
+   *
+   * Se para al ocultar la pestaña y se refresca al volver a ella: nadie quiere
+   * una aplicación pidiendo datos con el teléfono en el bolsillo. Tampoco se
+   * toca `loading`, para que el plano no parpadee cada medio minuto.
+   */
+  useEffect(() => {
+    const refrescar = () => {
+      if (document.hidden) return;
+      void fetchMap()
+        .then(apply)
+        .catch(() => {
+          // Un refresco fallido no molesta: se conserva lo último bueno y el
+          // siguiente intento llega en medio minuto.
+        });
+    };
+
+    const id = setInterval(refrescar, REFRESH_MS);
+    document.addEventListener('visibilitychange', refrescar);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', refrescar);
+    };
   }, [fetchMap, apply]);
 
   const spaces = useMemo(

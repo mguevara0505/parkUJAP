@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
@@ -54,13 +54,40 @@ export default function UserMapPage() {
     : undefined;
 
   const category = user?.category;
-  const myZones = category
-    ? zones.filter((z) => z.allowedCategories.includes(category))
-    : [];
+  // Memoizado porque de él depende el cálculo de sugerencias: un array nuevo
+  // en cada render lo recalcularía siempre.
+  const myZones = useMemo(
+    () =>
+      category
+        ? zones.filter((z) => z.allowedCategories.includes(category))
+        : [],
+    [zones, category],
+  );
   // El backend rechazaría el check-in igualmente; aquí solo se evita el intento
   const zoneIsMine = zone && category
     ? zone.allowedCategories.includes(category)
     : true;
+
+  /**
+   * Los mejores puestos libres para esta persona.
+   *
+   * Se calcula sobre el plano que ya está cargado: no hace falta pedir nada.
+   * El orden lo da `priority` (sección 17), que es lo cerca que queda el
+   * puesto de la entrada.
+   */
+  const sugerencias = useMemo(() => {
+    if (!category) return [];
+    const misZonaIds = new Set(myZones.map((z) => z.id));
+
+    return spaces
+      .filter((s) => s.status === 'AVAILABLE' && misZonaIds.has(s.zoneId))
+      .sort((a, b) =>
+        a.priority !== b.priority
+          ? a.priority - b.priority
+          : a.code.localeCompare(b.code),
+      )
+      .slice(0, 4);
+  }, [spaces, myZones, category]);
 
   const select = (space: MapSpace) => {
     setSelected(space);
@@ -138,6 +165,33 @@ export default function UserMapPage() {
       {error && (
         <div className="mb-6">
           <Alert>{error}</Alert>
+        </div>
+      )}
+
+      {/* Un toque en vez de buscar a ojo entre ~1.000 puestos */}
+      {canRegisterMore && sugerencias.length > 0 && (
+        <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10">
+          <p className="text-white font-semibold text-sm">
+            Puestos libres más cercanos a la entrada
+          </p>
+          <p className="text-slate-400 text-xs mt-0.5 mb-3">
+            Toque uno para verlo en el plano y registrarlo
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {sugerencias.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => select(s)}
+                className={`px-4 py-3 rounded-xl font-mono font-bold border transition-colors ${
+                  selected?.id === s.id
+                    ? 'bg-blue-600 text-white border-blue-400'
+                    : 'bg-green-500/10 text-green-300 border-green-500/25 hover:bg-green-500/20'
+                }`}
+              >
+                {s.code}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
