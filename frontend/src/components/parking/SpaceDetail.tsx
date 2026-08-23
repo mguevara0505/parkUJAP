@@ -2,12 +2,15 @@
 
 import {
   ADMIN_SETTABLE_STATUSES,
+  CATEGORY_SINGULAR,
   PRIORITY_LABELS,
   STATUS_META,
   TYPE_LABELS,
   type SpaceStatus,
   type SpaceType,
 } from '@/lib/parking';
+import { formatDateTime, formatDuration } from '@/lib/sessions';
+import type { SpaceDetailData } from '@/lib/space-detail';
 
 /** Campos que necesita el panel, presentes tanto en el mapa como en el CRUD. */
 export interface DetailSpace {
@@ -27,6 +30,14 @@ interface Props {
   /** Solo el ADMIN recibe acciones; el usuario ve el panel en modo lectura. */
   onChangeStatus?: (status: SpaceStatus) => void;
   onDisable?: () => void;
+  /**
+   * Ocupación y reserva del puesto (pantalla A03). Llega aparte del plano
+   * porque el mapa no las trae: son ~1.000 puestos y solo interesa el que se
+   * está mirando.
+   */
+  detail?: SpaceDetailData | null;
+  /** Liberar administrativamente: cierra la sesión de otra persona. */
+  onForceCheckOut?: () => void;
   emptyHint?: string;
   children?: React.ReactNode;
 }
@@ -37,6 +48,8 @@ export function SpaceDetail({
   lotLabel,
   onChangeStatus,
   onDisable,
+  detail,
+  onForceCheckOut,
   emptyHint = 'Seleccione un puesto del mapa para ver sus datos.',
   children,
 }: Props) {
@@ -80,6 +93,76 @@ export function SpaceDetail({
         <Row label="Accesible" value={space.isAccessible ? 'Sí ♿' : 'No'} />
         <Row label="Cubierto" value={space.isCovered ? 'Sí' : 'No'} />
       </dl>
+
+      {/* Quién lo ocupa ahora mismo */}
+      {detail?.activeSession && (
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            Ocupación actual
+          </p>
+          <dl className="space-y-1.5 text-sm">
+            <Row
+              label="Usuario"
+              value={`${detail.activeSession.user.firstName} ${detail.activeSession.user.lastName}`}
+            />
+            <Row label="Correo" value={detail.activeSession.user.email} />
+            <Row
+              label="Categoría"
+              value={CATEGORY_SINGULAR[detail.activeSession.user.category]}
+            />
+            <Row
+              label="Hora de entrada"
+              value={formatDateTime(detail.activeSession.checkInAt)}
+            />
+            <Row
+              label="Lleva estacionado"
+              value={formatDuration(detail.activeSession.checkInAt)}
+            />
+          </dl>
+
+          {onForceCheckOut && (
+            <button
+              onClick={onForceCheckOut}
+              className="mt-3 w-full px-3 py-2 rounded-xl text-xs font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-colors"
+            >
+              Liberar administrativamente
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Reserva vigente o la siguiente que llega */}
+      {detail?.reservation && (
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            Reserva
+          </p>
+          <dl className="space-y-1.5 text-sm">
+            <Row label="Motivo" value={detail.reservation.title} />
+            <Row
+              label="Desde"
+              value={formatDateTime(detail.reservation.startAt)}
+            />
+            <Row
+              label="Hasta"
+              value={formatDateTime(detail.reservation.endAt)}
+            />
+            {(detail.reservation.visitor ?? detail.reservation.user) && (
+              <Row
+                label="A nombre de"
+                value={(() => {
+                  const quien =
+                    detail.reservation.visitor ?? detail.reservation.user;
+                  return quien ? `${quien.firstName} ${quien.lastName}` : '—';
+                })()}
+              />
+            )}
+            {detail.reservation.vehiclePlate && (
+              <Row label="Placa" value={detail.reservation.vehiclePlate} />
+            )}
+          </dl>
+        </div>
+      )}
 
       {onChangeStatus && (
         <div className="mt-4 pt-4 border-t border-white/5">

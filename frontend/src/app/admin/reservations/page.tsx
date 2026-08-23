@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useCrud } from '@/lib/use-crud';
+import { useQueryParam } from '@/lib/use-query-param';
 import { Alert, Field, SelectField } from '@/components/admin-ui';
 import { errorMessage } from '@/lib/sessions';
 import {
@@ -57,6 +58,9 @@ export default function AdminReservationsPage() {
 
   const [form, setForm] = useState(EMPTY);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Al llegar desde «Reservar» en el mapa, el código ya viene en la URL
+  useQueryParam('code', (code) => setForm((f) => ({ ...f, code })));
   const [saving, setSaving] = useState(false);
   const [best, setBest] = useState<BestSpace[]>([]);
 

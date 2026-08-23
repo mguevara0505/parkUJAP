@@ -1,5 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, SpaceStatus, UserCategory } from '@prisma/client';
+import {
+  Prisma,
+  ReservationStatus,
+  SessionStatus,
+  SpaceStatus,
+  UserCategory,
+} from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination.dto';
 import { CreateParkingSpaceDto } from './dto/create-parking-space.dto';
@@ -62,6 +68,13 @@ export interface MapPayload {
  * seguirá siendo correcto; solo entonces valdría la pena compartirla.
  */
 const MAP_CACHE_TTL_MS = 5_000;
+
+/** Reservas que todavía pueden afectar a un puesto (pantalla A03). */
+const RELEVANT_RESERVATION_STATUSES = [
+  ReservationStatus.PENDING,
+  ReservationStatus.CONFIRMED,
+  ReservationStatus.ACTIVE,
+];
 
 @Injectable()
 export class ParkingSpacesService {
@@ -251,6 +264,14 @@ export class ParkingSpacesService {
     };
   }
 
+  /**
+   * Detalle completo de un puesto (pantalla A03).
+   *
+   * Trae también quién lo ocupa ahora y la reserva vigente o la próxima, que
+   * es lo que el administrador necesita para decidir si liberarlo. Va en una
+   * sola consulta y no en tres peticiones desde el navegador: el panel se abre
+   * al pulsar un puesto del mapa y tres viajes se notan.
+   */
   async findOne(id: string) {
     const space = await this.prisma.parkingSpace.findUnique({
       where: { id },
@@ -261,7 +282,45 @@ export class ParkingSpacesService {
             code: true,
             name: true,
             floor: true,
+            allowedCategories: true,
             parkingLot: { select: { id: true, code: true, name: true } },
+          },
+        },
+        sessions: {
+          where: { status: SessionStatus.ACTIVE },
+          select: {
+            id: true,
+            checkInAt: true,
+            slot: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                category: true,
+              },
+            },
+          },
+        },
+        reservations: {
+          // Vigentes o futuras. Las pasadas no ayudan a decidir nada.
+          where: {
+            status: { in: RELEVANT_RESERVATION_STATUSES },
+            endAt: { gte: new Date() },
+          },
+          orderBy: { startAt: 'asc' },
+          take: 1,
+          select: {
+            id: true,
+            title: true,
+            startAt: true,
+            endAt: true,
+            status: true,
+            reservationType: true,
+            vehiclePlate: true,
+            visitor: { select: { firstName: true, lastName: true } },
+            user: { select: { firstName: true, lastName: true } },
           },
         },
       },
@@ -271,7 +330,14 @@ export class ParkingSpacesService {
       throw new NotFoundException(`Puesto con ID ${id} no encontrado`);
     }
 
-    return space;
+    // Se aplanan las dos listas: como mucho hay un elemento en cada una y el
+    // panel lee mejor `activeSession` que `sessions[0]`.
+    const { sessions, reservations, ...rest } = space;
+    return {
+      ...rest,
+      activeSession: sessions[0] ?? null,
+      reservation: reservations[0] ?? null,
+    };
   }
 
   /** Busca por código (A-001), como lo teclea un administrador. */

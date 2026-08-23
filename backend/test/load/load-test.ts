@@ -221,16 +221,24 @@ async function main() {
 
   // ── Limpieza ──────────────────────────────────────────────
   console.log('\nLimpiando…');
+  // El puesto disputado va aparte a propósito: su sesión ganadora se borró al
+  // empezar el paso 4, así que ya no sale en esta consulta. Sin incluirlo,
+  // A-100 se quedaba OCUPADO para siempre y el mapa mostraba un puesto que
+  // nadie podía usar.
   const ocupados = await prisma.parkingSession.findMany({
     where: { userId: { in: userIds }, status: 'ACTIVE' },
     select: { parkingSpaceId: true },
   });
+  const aLiberar = new Set([
+    disputado.id,
+    ...ocupados.map((s) => s.parkingSpaceId),
+  ]);
   await prisma.auditLog.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.parkingSession.deleteMany({
     where: { userId: { in: userIds } },
   });
   await prisma.parkingSpace.updateMany({
-    where: { id: { in: ocupados.map((s) => s.parkingSpaceId) } },
+    where: { id: { in: [...aLiberar] } },
     data: { status: SpaceStatus.AVAILABLE },
   });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });

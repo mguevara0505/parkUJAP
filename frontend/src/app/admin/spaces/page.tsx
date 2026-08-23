@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useCrud } from '@/lib/use-crud';
+import { useQueryParam } from '@/lib/use-query-param';
 import { Alert, SelectField } from '@/components/admin-ui';
 import { SpaceDetail } from '@/components/parking/SpaceDetail';
 import {
@@ -31,6 +32,9 @@ export default function AdminSpacesPage() {
   });
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<ParkingSpace | null>(null);
+
+  // Al llegar desde «Editar» en el mapa, el código ya viene en la URL
+  useQueryParam('search', (search) => setFilters((f) => ({ ...f, search })));
 
   // El query se recalcula solo cuando cambia un filtro: useCrud lo usa como
   // dependencia del efecto de carga

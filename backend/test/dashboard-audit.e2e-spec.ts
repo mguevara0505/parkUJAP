@@ -275,15 +275,24 @@ describe('Dashboard y Auditoría (e2e)', () => {
       expect(JSON.stringify(entry)).not.toContain('SuperSecreta123');
     });
 
-    it('el login no se audita en absoluto', async () => {
+    it('el login no se audita, aunque sí el cierre de sesión', async () => {
       await loginAs(app, E2E_ADMIN);
 
       const res = await http()
-        .get('/api/v1/audit-logs?entityType=auth')
+        .get('/api/v1/audit-logs?entityType=auth&limit=100')
         .set(auth(adminToken))
         .expect(200);
 
-      expect((res.body as AuditList).meta.total).toBe(0);
+      const acciones = (res.body as AuditList).data.map((e) => e.action);
+
+      // Lo que prohíbe la sección 32 es registrar el login: su cuerpo lleva la
+      // contraseña. El logout sí se audita y debe hacerlo — no lleva
+      // credenciales y saber cuándo alguien cerró sesión es parte del rastro.
+      expect(acciones.filter((a) => a.includes('LOGIN'))).toHaveLength(0);
+      expect(acciones.filter((a) => a.includes('REFRESH'))).toHaveLength(0);
+
+      // Y en ningún caso puede haberse guardado una contraseña
+      expect(JSON.stringify(res.body)).not.toContain(E2E_ADMIN.password);
     });
   });
 

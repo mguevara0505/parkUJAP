@@ -310,4 +310,107 @@ describe('Parking Spaces (e2e)', () => {
       ).toBe(false);
     });
   });
+  /**
+   * Pantalla A03 — el administrador necesita ver quién ocupa el puesto y desde
+   * cuándo para decidir si lo libera. Sin esto el panel solo enseña metadatos.
+   */
+  describe('detalle del puesto (A03)', () => {
+    // Zona B: es donde pueden estacionarse los estudiantes (E2E_USER)
+    const CODIGO = 'B-090';
+    let spaceId: string;
+
+    const detalleDe = async (id: string) => {
+      const res = await get(`/api/v1/parking-spaces/${id}`)
+        .set(asAdmin())
+        .expect(200);
+      return (
+        res.body as {
+          data: {
+            code: string;
+            activeSession: {
+              id: string;
+              checkInAt: string;
+              user: { email: string };
+            } | null;
+            reservation: { id: string } | null;
+          };
+        }
+      ).data;
+    };
+
+    beforeAll(async () => {
+      const space = await prisma.parkingSpace.findUniqueOrThrow({
+        where: { code: CODIGO },
+        select: { id: true },
+      });
+      spaceId = space.id;
+
+      // Estado limpio: otra spec pudo dejar el puesto ocupado, o al usuario
+      // de pruebas con sus dos plazas de estudiante ya gastadas
+      await prisma.parkingSession.deleteMany({
+        where: {
+          OR: [
+            { parkingSpaceId: spaceId },
+            { user: { email: E2E_USER.email } },
+          ],
+        },
+      });
+      await prisma.parkingSpace.update({
+        where: { id: spaceId },
+        data: { status: SpaceStatus.AVAILABLE },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.parkingSession.deleteMany({
+        where: { parkingSpaceId: spaceId },
+      });
+      await prisma.parkingSpace.update({
+        where: { id: spaceId },
+        data: { status: SpaceStatus.AVAILABLE },
+      });
+    });
+
+    it('sin ocupar, no informa ni sesión ni reserva', async () => {
+      const data = await detalleDe(spaceId);
+
+      expect(data.code).toBe(CODIGO);
+      expect(data.activeSession).toBeNull();
+      expect(data.reservation).toBeNull();
+    });
+
+    it('ocupado, informa quién y desde cuándo', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/parking-sessions/check-in')
+        .set(asUser())
+        .send({ parkingSpaceId: spaceId })
+        .expect(201);
+
+      const data = await detalleDe(spaceId);
+
+      expect(data.activeSession).not.toBeNull();
+      expect(data.activeSession!.user.email).toBe(E2E_USER.email);
+      expect(Date.parse(data.activeSession!.checkInAt)).not.toBeNaN();
+    });
+
+    it('tras liberarlo administrativamente, deja de informar ocupación', async () => {
+      const ocupado = await detalleDe(spaceId);
+      const sessionId = ocupado.activeSession!.id;
+
+      // El ADMIN cierra la sesión de otra persona: es la acción «liberar
+      // administrativamente» del panel
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/parking-sessions/${sessionId}/check-out`)
+        .set(asAdmin())
+        .expect(200);
+
+      // El panel lee este estado para repintar el puesto sin recargar el plano
+      const { data: sesion } = res.body as {
+        data: { parkingSpace: { status: string } };
+      };
+      expect(sesion.parkingSpace.status).toBe('AVAILABLE');
+
+      expect((await detalleDe(spaceId)).activeSession).toBeNull();
+    });
+  });
 });

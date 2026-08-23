@@ -15,13 +15,15 @@ export function proxy(request: NextRequest) {
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
   const isAdminRoute = ADMIN_ROUTES.some((route) => pathname.startsWith(route));
 
-  // Redirigir a login si no está autenticado
-  if (!isAuthenticated && !isPublicRoute && pathname !== '/') {
+  // Sin sesión, todo lleva al login. La raíz incluida: el sistema arranca
+  // ahí, no en una pantalla de presentación.
+  if (!isAuthenticated && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Redirigir al dashboard si ya está autenticado y va a /login
-  if (isAuthenticated && isPublicRoute) {
+  // Con sesión, ni el login ni la raíz tienen nada que mostrar: cada quien a
+  // su panel según su rol.
+  if (isAuthenticated && (isPublicRoute || pathname === '/')) {
     const redirectTo = role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
     return NextResponse.redirect(new URL(redirectTo, request.url));
   }

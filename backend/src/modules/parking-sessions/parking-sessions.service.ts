@@ -43,6 +43,9 @@ const SESSION_INCLUDE = {
     select: {
       id: true,
       code: true,
+      // El estado tras el check-out lo decide la RN-015 y puede no ser
+      // AVAILABLE: quien libera un puesto necesita saber en qué quedó.
+      status: true,
       type: true,
       isCovered: true,
       isAccessible: true,
