@@ -1,83 +1,198 @@
 # UJAP Parking 🚗
 
-**Sistema de Gestión y Reserva de Estacionamientos**  
+**Sistema de Gestión y Reserva de Estacionamientos**
 **Universidad José Antonio Páez**
 
----
-
-## 📋 Descripción
-
-Plataforma web para gestionar aproximadamente **1.000 puestos de estacionamiento** de la Universidad José Antonio Páez. Permite a usuarios registrar su ocupación y al administrador visualizar el estado global, reservar puestos y gestionar visitantes.
+Plataforma web para gestionar los **1.000 puestos** del campus. El estudiante
+registra dónde dejó el carro; el administrador ve el estado global, reserva
+puestos para eventos, gestiona visitantes y bloquea puestos por mantenimiento.
 
 ---
 
-## 🧩 Stack Tecnológico
+## 🧩 Stack
 
 | Capa | Tecnología |
 |------|-----------|
-| Backend | NestJS 11 + TypeScript |
-| ORM | Prisma 7 |
+| Backend | NestJS 11 + TypeScript (monolito modular) |
+| ORM | Prisma 7 (driver adapter `@prisma/adapter-pg`) |
 | Base de datos | PostgreSQL 16 |
 | Frontend | Next.js 16 (App Router) + Tailwind CSS |
-| Autenticación | JWT (Access + Refresh) |
-| Documentación | Swagger/OpenAPI |
-| Testing | Jest + Supertest + Playwright |
-| DevOps | Docker + Docker Compose |
+| Autenticación | JWT (access + refresh) |
+| Documentación | Swagger / OpenAPI |
+| Pruebas | Jest + Supertest (142 e2e, 22 unitarias) |
+| DevOps | Docker + Docker Compose + GitHub Actions |
 
 ---
 
-## 🚀 Inicio Rápido
+## 📋 Requisitos
 
-### Requisitos
+- **Node.js 24** (es la versión de las imágenes Docker y del CI)
+- **Docker Desktop**
+- **npm 11** (viene con Node 24)
 
-- Node.js >= 20
-- Docker Desktop
-- npm >= 10
+> ⚠️ **Docker Desktop hay que abrirlo a mano y aceptar el aviso de
+> administrador de Windows.** Su motor no arranca solo: si el servicio
+> `com.docker.service` está detenido, ningún comando `docker` funciona y no
+> habrá base de datos. Es el fallo más común al empezar.
 
-### 1. Clonar y configurar entorno
+---
+
+## 🚀 Puesta en marcha
+
+### Paso 1 — Clonar y configurar
 
 ```bash
-# Copiar variables de entorno del backend
+git clone https://github.com/mguevara0505/parkUJAP.git
+cd parkUJAP
+```
+
+```bash
 cp backend/.env.example backend/.env.development
 ```
 
-### 2. Levantar con Docker Compose
+> Los archivos `.env` no se versionan (están en `.gitignore`). Sin este paso el
+> backend usa valores por defecto que funcionan en local, pero conviene tener
+> el archivo para poder cambiarlos.
+
+### Paso 2 — Elegir cómo levantarlo
+
+#### Opción A — Todo con Docker (lo más rápido)
 
 ```bash
 docker compose up --build
 ```
 
-Esto levanta automáticamente:
-- **PostgreSQL** en `localhost:5432`
-- **API NestJS** en `localhost:3001`
-- **Frontend Next.js** en `localhost:3000`
-- **pgAdmin** en `localhost:5050`
+Levanta PostgreSQL, la API, el frontend y pgAdmin.
 
-### 3. Sin Docker (desarrollo local)
+#### Opción B — Solo la base en Docker (recomendado para desarrollar)
 
 ```bash
-# 1. Solo la base de datos en Docker
 docker compose up -d postgres
-
-# 2. Backend
-cd backend
-npm install
-npx prisma migrate deploy   # aplica las migraciones existentes
-npm run seed                # admin, 20 usuarios por categoría, 10 zonas y 1.000 puestos
-npm run start:dev
-
-# 3. Frontend (otra terminal)
-cd frontend
-npm install
-npm run dev
 ```
 
-### Credenciales del seed
+```bash
+cd backend && npm install && npx prisma migrate deploy && npm run start:dev
+```
 
-| Rol | Correo | Contraseña |
-|-----|--------|-----------|
-| ADMIN | `admin@ujap.edu.ve` | `Admin1234!` |
-| USER | `carlos.rodriguez@ujap.edu.ve` | `User1234!` |
+```bash
+cd frontend && npm install && npm run dev
+```
+
+### Paso 3 — Sembrar los datos ⚠️ **obligatorio la primera vez**
+
+**La base arranca vacía: sin este paso no hay usuarios y no se puede entrar.**
+
+Si usó la **opción A** (todo en Docker):
+
+```bash
+docker compose exec api npm run seed
+```
+
+Si usó la **opción B** (backend local):
+
+```bash
+cd backend && npm run seed
+```
+
+Crea el administrador, 20 usuarios, 10 zonas y los 1.000 puestos. Se puede
+volver a ejecutar cuantas veces haga falta: no duplica nada ni pisa las
+contraseñas.
+
+### Paso 4 — Entrar
+
+Abrir **http://localhost:3000** — la aplicación arranca directamente en el
+login. Las credenciales de prueba aparecen escritas en la propia pantalla.
+
+---
+
+## 👥 Usuarios de prueba
+
+Todos los creados por el seed. **La contraseña es la misma para todos los
+usuarios normales.**
+
+### Administrador
+
+| Correo | Contraseña |
+|--------|-----------|
+| `admin@ujap.edu.ve` | `Admin1234!` |
+
+### Estudiantes — contraseña `User1234!`
+
+Pueden estacionarse en las zonas **A, B, C, D** y ocupar **2 puestos a la vez**.
+
+| Nombre | Correo | Cédula univ. |
+|--------|--------|--------------|
+| Carlos Rodríguez | `carlos.rodriguez@ujap.edu.ve` | 2023-001 |
+| María González | `maria.gonzalez@ujap.edu.ve` | 2023-002 |
+| Luis Martínez | `luis.martinez@ujap.edu.ve` | 2023-003 |
+| Ana López | `ana.lopez@ujap.edu.ve` | 2023-004 |
+| Pedro García | `pedro.garcia@ujap.edu.ve` | 2023-005 |
+| Laura Hernández | `laura.hernandez@ujap.edu.ve` | 2023-006 |
+| José Díaz | `jose.diaz@ujap.edu.ve` | 2023-007 |
+| Sofía Fernández | `sofia.fernandez@ujap.edu.ve` | 2023-008 |
+| Miguel Torres | `miguel.torres@ujap.edu.ve` | 2023-009 |
+| Valentina Vargas | `valentina.vargas@ujap.edu.ve` | 2023-010 |
+| Andrés Jiménez | `andres.jimenez@ujap.edu.ve` | 2024-001 |
+| Isabella Morales | `isabella.morales@ujap.edu.ve` | 2024-002 |
+| Diego Castillo | `diego.castillo@ujap.edu.ve` | 2024-003 |
+| Camila Romero | `camila.romero@ujap.edu.ve` | 2024-004 |
+
+### Profesores — contraseña `User1234!`
+
+Zonas **E, F, G** · **1 puesto** a la vez.
+
+| Nombre | Correo | Cédula univ. |
+|--------|--------|--------------|
+| Sebastián Flores | `sebastian.flores@ujap.edu.ve` | PROF-001 |
+| Gabriela Reyes | `gabriela.reyes@ujap.edu.ve` | PROF-002 |
+| Alejandro Cruz | `alejandro.cruz@ujap.edu.ve` | PROF-003 |
+| Daniela Mora | `daniela.mora@ujap.edu.ve` | PROF-004 |
+
+### Administrativos — contraseña `User1234!`
+
+Zona **H** · **1 puesto** a la vez.
+
+| Nombre | Correo | Cédula univ. |
+|--------|--------|--------------|
+| Ricardo Sánchez | `ricardo.sanchez@ujap.edu.ve` | ADM-001 |
+| Mariana Gutiérrez | `mariana.gutierrez@ujap.edu.ve` | ADM-002 |
+
+---
+
+## 🅿️ Cómo se usa
+
+### Si entra como estudiante, profesor o administrativo
+
+**Registrar dónde se estacionó** — el camino corto:
+
+1. En la pantalla de inicio, escribir el **código pintado en el piso**
+   (`A-050`). Vale escribirlo como sea: `a50`, `A50`, `a-50` → todos
+   encuentran **A-050**.
+2. Pulsar **Buscar**. Aparece el puesto con su zona y su estado.
+3. Pulsar **ME ESTACIONÉ AQUÍ**.
+
+**Si no sabe dónde estacionarse:** entrar en **Mapa** y usar «Puestos libres
+más cercanos a la entrada», o tocar cualquier puesto verde del plano. El mapa
+se actualiza solo cada 30 segundos.
+
+**Al irse:** el botón **SALIR / LIBERAR PUESTO** está en la pantalla de inicio,
+debajo del código donde está estacionado.
+
+**En el teléfono** hay una barra inferior con las cuatro pantallas: Inicio,
+Mapa, Mi puesto e Historial.
+
+### Si entra como administrador
+
+| Pantalla | Para qué |
+|----------|----------|
+| **Dashboard** | Ocupación global, por zona y por hora |
+| **Mapa de Puestos** | Los 1.000 puestos. Al tocar uno se ve **quién lo ocupa, desde cuándo** y su reserva, y se puede **liberar administrativamente**, reservar, editar o bloquear |
+| **Estacionamientos / Zonas / Puestos** | Estructura del campus. En Zonas se decide qué categoría entra en cada una |
+| **Reservas** | Reservas por evento, visitante o autoridad. Sugiere los mejores puestos libres |
+| **Visitantes** | Registro de visitantes y sus vehículos |
+| **Mantenimiento** | Bloquear puestos con motivo y fechas |
+| **Usuarios** | Crear, editar, activar/desactivar y cambiar categoría o rol |
+| **Auditoría** | Toda escritura queda registrada. Las contraseñas se guardan como `[oculto]` |
 
 ---
 
@@ -89,7 +204,10 @@ npm run dev
 | API | http://localhost:3001/api/v1 |
 | Swagger | http://localhost:3001/api/v1/docs |
 | Health | http://localhost:3001/api/v1/health |
-| pgAdmin | http://localhost:5050 |
+| pgAdmin *(solo opción A)* | http://localhost:5050 — `admin@ujap.edu.ve` / `admin123` |
+
+> pgAdmin tarda cerca de un minuto en levantar. Si no responde al principio,
+> no está roto: hay que darle tiempo.
 
 ---
 
@@ -100,27 +218,27 @@ Son dos ejes independientes: el **rol** decide qué puede hacer en el sistema, l
 
 | Rol | Descripción |
 |-----|-------------|
-| `USER` | Estudiante/profesor/empleado — registra su estacionamiento |
-| `ADMIN` | Administrador — gestiona puestos, reservas y visitantes |
+| `USER` | Registra su propio estacionamiento |
+| `ADMIN` | Gestiona puestos, reservas, visitantes y usuarios |
 
-| Categoría | Zonas propias | Puestos a la vez |
-|-----------|---------------|------------------|
+| Categoría | Zonas | Puestos a la vez |
+|-----------|-------|------------------|
 | `STUDENT` | A, B, C, D | 2 |
 | `PROFESSOR` | E, F, G | 1 |
 | `STAFF` | H | 1 |
 
 Las zonas **I y J** no admiten registro por iniciativa propia: se acceden solo
 mediante una reserva administrativa (autoridades, proveedores, visitantes y
-eventos). Un usuario con una reserva a su nombre sí puede ocupar el puesto
-reservado, sea cual sea la zona.
+eventos). Quien tenga una reserva a su nombre sí puede ocupar ese puesto, sea
+cual sea la zona.
 
-Un estudiante puede necesitar dos puestos (coche y moto, o un vehículo
+Un estudiante puede necesitar dos puestos (carro y moto, o un vehículo
 compartido); a profesores y administrativos les corresponde uno. El tope lo
-impone un índice único de PostgreSQL sobre el cupo, no un contador en código.
+impone un índice único de PostgreSQL, no un contador en código.
 
-Las categorías se asignan desde **Usuarios** y el reparto de zonas desde **Zonas**: cada zona
-tiene interruptores por categoría, y dejarlas todas apagadas la convierte en
-zona de reserva exclusiva. La regla la aplica el backend, no solo la interfaz.
+El reparto se cambia desde **Zonas**, con interruptores por categoría: dejarlas
+todas apagadas convierte la zona en exclusiva de reserva. La regla la aplica el
+backend, no solo la interfaz.
 
 > Este reparto por categoría es una decisión posterior al Documento Maestro,
 > que en su sección 7.1 trata a todos los usuarios por igual. Conviene
@@ -128,91 +246,32 @@ zona de reserva exclusiva. La regla la aplica el backend, no solo la interfaz.
 
 ---
 
-## 📦 Estructura del Proyecto
-
-```
-ujap-parking/
-├── backend/                    ← NestJS Monolito Modular
-│   ├── src/
-│   │   ├── common/             ← Guards, decorators, filters, interceptors
-│   │   ├── config/             ← Configuración tipada
-│   │   ├── database/           ← Prisma Service + Seeds
-│   │   └── modules/            ← Módulos funcionales
-│   │       ├── auth/
-│   │       ├── users/
-│   │       ├── parking-lots/
-│   │       ├── parking-zones/
-│   │       ├── parking-spaces/
-│   │       ├── parking-sessions/
-│   │       ├── reservations/
-│   │       ├── visitors/
-│   │       ├── maintenance/
-│   │       ├── dashboard/
-│   │       ├── audit/
-│   │       └── health/
-│   └── prisma/
-│       └── schema.prisma       ← Todos los modelos
-├── frontend/                   ← Next.js 16 (src/proxy.ts protege las rutas)
-├── docker-compose.yml
-└── README.md
-```
-
----
-
-## 🗓️ Sprints
-
-| Sprint | Descripción | Estado |
-|--------|-------------|--------|
-| 0 | Preparación y estructura base | ✅ Completado |
-| 1 | Autenticación + Usuarios | ✅ Completado |
-| 2 | Estacionamientos + Zonas | ✅ Completado |
-| 3 | Puestos (~1.000) | ✅ Completado |
-| 4 | Mapa Visual (SVG) | ✅ Completado |
-| 5 | Check-in / Check-out | ✅ Completado |
-| 6 | Concurrencia | ✅ Completado |
-| 7 | Reservas administrativas | ✅ Completado |
-| 8 | Visitantes y eventos | ✅ Completado |
-| 9 | Bloqueos y mantenimiento | ✅ Completado |
-| 10 | Dashboard + Auditoría | ✅ Completado |
-| 11 | QA + Seguridad + Performance | ✅ Completado |
-| 12 | Deploy MVP | ✅ Completado |
-
-Para poner el sistema en un servidor: **[DESPLIEGUE.md](DESPLIEGUE.md)**.
-
----
-
-## 🧪 Tests
+## 🧪 Pruebas
 
 ```bash
 cd backend
+```
 
-# Unitarios
+```bash
 npm run test
+```
 
-# Watch mode
-npm run test:watch
-
-# Cobertura
-npm run test:cov
-
-# E2E — requiere PostgreSQL corriendo (docker compose up -d postgres)
+```bash
 npm run test:e2e
 ```
 
-Los tests E2E crean y borran sus propios usuarios `e2e-*`, así que no dependen del seed
-ni lo modifican.
+Los e2e necesitan PostgreSQL corriendo y el seed aplicado. Crean y borran sus
+propios usuarios `e2e-*`, así que no dependen del resto de datos ni los
+modifican.
 
 ### Prueba de carga
 
-Comprueba los objetivos de rendimiento de la sección 46 con los 100 usuarios
-simultáneos que exige la sección 11, contra una API ya levantada:
+Comprueba los objetivos de rendimiento con los 100 usuarios simultáneos que
+exige el Documento Maestro. Necesita la API ya levantada en otra terminal:
 
 ```bash
 npm run test:load
 ```
-
-Mide el mapa, el dashboard y el check-in, y verifica que 100 personas peleando
-por el mismo puesto produzcan **exactamente una** ocupación.
 
 Últimos resultados medidos (API en modo desarrollo, 1.000 puestos):
 
@@ -223,7 +282,96 @@ por el mismo puesto produzcan **exactamente una** ocupación.
 | `POST /parking-sessions/check-in` | < 500 ms | 381 ms | 393 ms |
 
 Los tiempos son los del **último de 100 peticiones en cola**, no los de una
-petición aislada.
+petición aislada. La prueba verifica además que 100 personas peleando por el
+mismo puesto produzcan **exactamente una** ocupación.
+
+---
+
+## 📦 Estructura
+
+```
+parkUJAP/
+├── backend/                    ← NestJS
+│   ├── src/
+│   │   ├── common/             ← Guards, filtros, interceptores
+│   │   ├── database/           ← Prisma + seed
+│   │   └── modules/            ← auth, users, parking-*, reservations,
+│   │                             visitors, maintenance, dashboard, audit
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   └── migrations/         ← incluye SQL escrito a mano (ver abajo)
+│   └── test/                   ← 11 suites e2e + prueba de carga
+├── frontend/                   ← Next.js (src/proxy.ts protege las rutas)
+├── scripts/                    ← backup.sh y restore.sh
+├── .github/workflows/ci.yml
+├── docker-compose.yml          ← desarrollo
+├── docker-compose.prod.yml     ← producción
+├── DESPLIEGUE.md               ← puesta en un servidor
+└── README.md
+```
+
+> **Las migraciones llevan SQL escrito a mano** (índices únicos parciales y una
+> restricción `EXCLUDE`) que Prisma no sabe expresar y que **son** las reglas de
+> negocio: nadie puede ocupar dos veces el mismo puesto ni solapar reservas.
+> Usar siempre `prisma migrate deploy`. Si `prisma migrate dev` propone
+> eliminarlos, **no aceptar**.
+
+---
+
+## 🗓️ Sprints
+
+| Sprint | Descripción | Estado |
+|--------|-------------|--------|
+| 0 | Preparación y estructura base | ✅ |
+| 1 | Autenticación + Usuarios | ✅ |
+| 2 | Estacionamientos + Zonas | ✅ |
+| 3 | Puestos (1.000) | ✅ |
+| 4 | Mapa visual (SVG) | ✅ |
+| 5 | Check-in / Check-out | ✅ |
+| 6 | Concurrencia | ✅ |
+| 7 | Reservas administrativas | ✅ |
+| 8 | Visitantes y eventos | ✅ |
+| 9 | Bloqueos y mantenimiento | ✅ |
+| 10 | Dashboard + Auditoría | ✅ |
+| 11 | QA + Seguridad + Rendimiento | ✅ |
+| 12 | Despliegue del MVP | ✅ |
+
+Para poner el sistema en un servidor: **[DESPLIEGUE.md](DESPLIEGUE.md)**.
+
+---
+
+## 🔧 Problemas frecuentes
+
+**`docker: cannot find the file specified` o los comandos `docker` se quedan
+colgados.**
+Docker Desktop no está corriendo o su motor no arrancó. Abrirlo a mano y
+aceptar el aviso de administrador de Windows.
+
+**No puedo entrar: «Credenciales incorrectas» con el usuario del seed.**
+Falta sembrar la base (paso 3). Comprobar que hay usuarios:
+
+```bash
+docker compose exec postgres psql -U ujap_user -d ujap_parking_db -c "SELECT count(*) FROM users"
+```
+
+**«La base de datos no está disponible».**
+PostgreSQL no terminó de arrancar o el contenedor está caído:
+
+```bash
+docker compose ps
+```
+
+**Demasiados intentos de inicio de sesión.**
+El login admite 10 intentos cada 5 minutos **por correo** (no por IP, para no
+castigar a todo el campus, que sale por un único NAT). Esperar cinco minutos o
+entrar con otro usuario.
+
+**El mapa no muestra puestos.**
+Falta el seed, o hay filtros activos. En el panel de filtros, «Actualizar».
+
+**Un puesto aparece ocupado y nadie lo usa.**
+Desde **Mapa de Puestos**, tocarlo y usar «Liberar administrativamente» si
+tiene sesión activa, o «Cambiar estado → Disponible» si no la tiene.
 
 ---
 
