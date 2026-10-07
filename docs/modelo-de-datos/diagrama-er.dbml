@@ -1,0 +1,294 @@
+// UJAP Parking — Diagrama entidad-relación completo
+// Pegar este archivo en https://dbdiagram.io/d para ver el diagrama.
+// Fuente: backend/prisma/schema.prisma + migraciones en backend/prisma/migrations
+
+Project ujap_parking {
+  database_type: 'PostgreSQL'
+  Note: 'Sistema de gestión y reserva de estacionamientos — Universidad José Antonio Páez'
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+Enum Role {
+  USER
+  ADMIN
+}
+
+Enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+Enum UserCategory {
+  STUDENT
+  PROFESSOR
+  STAFF
+}
+
+Enum SpaceType {
+  STANDARD
+  VISITOR
+  PROFESSOR
+  STAFF
+  ACCESSIBLE
+  VIP
+  MOTORCYCLE
+  OTHER
+}
+
+Enum SpaceStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  DISABLED
+  MAINTENANCE
+}
+
+Enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+Enum SessionSource {
+  WEB
+  MOBILE
+  ADMIN
+}
+
+Enum ReservationType {
+  VISITOR
+  EVENT
+  PROFESSOR
+  AUTHORITY
+  STAFF
+  EXTERNAL
+  OTHER
+}
+
+Enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+Enum MaintenanceReason {
+  PAINTING
+  MAINTENANCE
+  CONSTRUCTION
+  SECURITY
+  EVENT
+  OTHER
+}
+
+Enum MaintenanceStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// USUARIOS Y AUTENTICACIÓN
+// ─────────────────────────────────────────────
+
+Table users {
+  id           text         [pk, note: 'UUID']
+  firstName    text         [not null]
+  lastName     text         [not null]
+  email        text         [not null, unique]
+  passwordHash text         [not null]
+  role         Role         [not null, default: 'USER', note: 'QUÉ puede hacer']
+  category     UserCategory [not null, default: 'STUDENT', note: 'DÓNDE puede estacionarse']
+  universityId text
+  documentId   text
+  phone        text
+  status       UserStatus   [not null, default: 'ACTIVE']
+  lastLoginAt  timestamp
+  createdAt    timestamp    [not null, default: `now()`]
+  updatedAt    timestamp    [not null]
+}
+
+Table refresh_tokens {
+  id        text      [pk]
+  token     text      [not null, unique]
+  userId    text      [not null]
+  expiresAt timestamp [not null]
+  createdAt timestamp [not null, default: `now()`]
+}
+
+// ─────────────────────────────────────────────
+// ESTRUCTURA FÍSICA: estacionamiento → zona → puesto
+// ─────────────────────────────────────────────
+
+Table parking_lots {
+  id          text      [pk]
+  name        text      [not null]
+  code        text      [not null, unique]
+  description text
+  location    text
+  totalSpaces int       [not null, default: 0]
+  isActive    boolean   [not null, default: true]
+  createdAt   timestamp [not null, default: `now()`]
+  updatedAt   timestamp [not null]
+}
+
+Table parking_zones {
+  id                text             [pk]
+  parkingLotId      text             [not null]
+  name              text             [not null]
+  code              text             [not null, unique]
+  description       text
+  floor             int              [default: 1]
+  sortOrder         int              [not null, default: 0]
+  isActive          boolean          [not null, default: true]
+  allowedCategories "UserCategory[]" [note: 'Lista vacía = solo por reserva']
+  createdAt         timestamp        [not null, default: `now()`]
+  updatedAt         timestamp        [not null]
+}
+
+Table parking_spaces {
+  id           text        [pk]
+  zoneId       text        [not null]
+  code         text        [not null, unique, note: 'Ej: A-001']
+  number       int         [not null]
+  type         SpaceType   [not null, default: 'STANDARD']
+  status       SpaceStatus [not null, default: 'AVAILABLE']
+  isAccessible boolean     [not null, default: false]
+  isCovered    boolean     [not null, default: false]
+  priority     int         [not null, default: 3]
+  positionX    float       [not null, default: 0, note: 'Posición en el mapa']
+  positionY    float       [not null, default: 0]
+  width        float       [not null, default: 60]
+  height       float       [not null, default: 100]
+  rotation     float       [not null, default: 0]
+  metadata     jsonb
+  createdAt    timestamp   [not null, default: `now()`]
+  updatedAt    timestamp   [not null]
+
+  Indexes {
+    status
+    zoneId
+  }
+}
+
+// ─────────────────────────────────────────────
+// OPERACIÓN: sesiones, reservas, visitantes, mantenimiento
+// ─────────────────────────────────────────────
+
+Table parking_sessions {
+  id             text          [pk]
+  userId         text          [not null]
+  parkingSpaceId text          [not null]
+  reservationId  text          [note: 'Opcional: la sesión nace de una reserva']
+  slot           int           [not null, default: 1, note: 'Cupo del usuario (1..N según categoría)']
+  checkInAt      timestamp     [not null, default: `now()`]
+  checkOutAt     timestamp
+  status         SessionStatus [not null, default: 'ACTIVE']
+  source         SessionSource [not null, default: 'WEB']
+  notes          text
+  createdAt      timestamp     [not null, default: `now()`]
+  updatedAt      timestamp     [not null]
+
+  Note: '''
+  RN-001: un puesto con una sola sesión ACTIVE (índice único parcial).
+  RN-002: un usuario no repite cupo entre sus sesiones ACTIVE (índice único parcial).
+  '''
+}
+
+Table reservations {
+  id                 text              [pk]
+  parkingSpaceId     text              [not null]
+  createdByAdminId   text              [not null]
+  visitorId          text              [note: 'Si la reserva es para un visitante externo']
+  userId             text              [note: 'Si la reserva es para un miembro de la UJAP']
+  title              text              [not null]
+  description        text
+  reservationType    ReservationType   [not null, default: 'VISITOR']
+  startAt            timestamp         [not null]
+  endAt              timestamp         [not null]
+  status             ReservationStatus [not null, default: 'PENDING']
+  priority           int               [not null, default: 3]
+  vehiclePlate       text
+  vehicleDescription text
+  notes              text
+  createdAt          timestamp         [not null, default: `now()`]
+  updatedAt          timestamp         [not null]
+
+  Note: '''
+  RN-006: dos reservas vigentes del mismo puesto no se solapan (EXCLUDE USING gist).
+  CHECK: endAt > startAt.
+  '''
+}
+
+Table visitors {
+  id           text      [pk]
+  firstName    text      [not null]
+  lastName     text      [not null]
+  documentId   text      [unique, note: 'Cédula, opcional']
+  email        text
+  phone        text
+  organization text
+  vehiclePlate text
+  vehicleBrand text
+  vehicleModel text
+  vehicleColor text
+  notes        text
+  createdAt    timestamp [not null, default: `now()`]
+  updatedAt    timestamp [not null]
+}
+
+Table maintenance_blocks {
+  id             text              [pk]
+  parkingSpaceId text              [not null]
+  createdById    text              [not null]
+  reason         MaintenanceReason [not null, default: 'MAINTENANCE']
+  description    text
+  startAt        timestamp         [not null]
+  endAt          timestamp         [not null]
+  status         MaintenanceStatus [not null, default: 'SCHEDULED']
+  createdAt      timestamp         [not null, default: `now()`]
+  updatedAt      timestamp         [not null]
+}
+
+Table audit_logs {
+  id         text      [pk]
+  userId     text      [not null]
+  action     text      [not null]
+  entityType text      [not null]
+  entityId   text      [note: 'Sin FK: apunta a cualquier tabla']
+  oldValue   jsonb
+  newValue   jsonb
+  ipAddress  text
+  userAgent  text
+  createdAt  timestamp [not null, default: `now()`]
+}
+
+// ─────────────────────────────────────────────
+// RELACIONES  ( > = muchos-a-uno )
+// ─────────────────────────────────────────────
+
+Ref: refresh_tokens.userId > users.id [delete: cascade]
+
+Ref: parking_zones.parkingLotId > parking_lots.id [delete: restrict]
+Ref: parking_spaces.zoneId > parking_zones.id [delete: restrict]
+
+Ref: parking_sessions.userId > users.id [delete: restrict]
+Ref: parking_sessions.parkingSpaceId > parking_spaces.id [delete: restrict]
+Ref: parking_sessions.reservationId > reservations.id [delete: set null]
+
+Ref: reservations.parkingSpaceId > parking_spaces.id [delete: restrict]
+Ref: reservations.createdByAdminId > users.id [delete: restrict]
+Ref: reservations.userId > users.id [delete: set null]
+Ref: reservations.visitorId > visitors.id [delete: set null]
+
+Ref: maintenance_blocks.parkingSpaceId > parking_spaces.id [delete: restrict]
+Ref: maintenance_blocks.createdById > users.id [delete: restrict]
+
+Ref: audit_logs.userId > users.id [delete: restrict]
